@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Screen 2 — Identify · Dead Man's Switch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #000000;
+        --panel: #0a0a0a;
+        --panel-2: #0f0f0f;
+        --border: #1f1f1f;
+        --green: #00ff88;
+        --green-dim: #00aa5a;
+        --amber: #ffb020;
+        --violet: #a78bfa;
+        --red: #ff3355;
+        --text: #e8e8e8;
+        --muted: #6a6a6a;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.025) 0,
+          rgba(255, 255, 255, 0.025) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        pointer-events: none;
+        z-index: 100;
+        mix-blend-mode: overlay;
+      }
+      .grid-bg {
+        background-image: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          );
+        background-size: 40px 40px;
+      }
+
+      .glow-green { text-shadow: 0 0 12px rgba(0,255,136,.7), 0 0 32px rgba(0,255,136,.35); }
+      .glow-amber { text-shadow: 0 0 12px rgba(255,176,32,.7), 0 0 32px rgba(255,176,32,.35); }
+      .glow-violet { text-shadow: 0 0 12px rgba(167,139,250,.7), 0 0 32px rgba(167,139,250,.35); }
+
+      .blink { animation: blink 1.2s steps(2, jump-none) infinite; }
+      @keyframes blink { 50% { opacity: 0.18; } }
+
+      .fade-in { animation: fadeIn 600ms cubic-bezier(.2,.7,.2,1) forwards; opacity: 0; }
+      @keyframes fadeIn { to { opacity: 1; } }
+      .delay-1 { animation-delay: 80ms; }
+      .delay-2 { animation-delay: 250ms; }
+      .delay-3 { animation-delay: 500ms; }
+      .delay-4 { animation-delay: 750ms; }
+      .delay-5 { animation-delay: 1000ms; }
+
+      .slide-from-left  { animation: slideL 700ms cubic-bezier(.2,.7,.2,1) forwards; opacity: 0; transform: translateX(-40px); }
+      .slide-from-right { animation: slideR 700ms cubic-bezier(.2,.7,.2,1) forwards; opacity: 0; transform: translateX(40px); }
+      @keyframes slideL { to { opacity: 1; transform: translateX(0); } }
+      @keyframes slideR { to { opacity: 1; transform: translateX(0); } }
+
+      .stamp {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .stamp-bright { color: var(--text); }
+
+      .prompt-line {
+        font-size: clamp(1.4rem, 3.4vw, 2.4rem);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--text);
+      }
+      .prompt-line .pf { color: var(--green); }
+
+      /* --- ROLE TILE --- */
+      .tile {
+        position: relative;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 2.5rem 2.25rem;
+        text-decoration: none;
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1.5rem;
+        cursor: pointer;
+        transition: all 280ms cubic-bezier(.2,.8,.2,1);
+        min-height: 460px;
+      }
+      .tile-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+      @media (max-width: 880px) {
+        .tile-grid { grid-template-columns: 1fr; }
+        .tile { min-height: auto; }
+      }
+      /* corner brackets on tile */
+      .tile::before, .tile::after,
+      .tile > .corner-tr, .tile > .corner-bl {
+        content: "";
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        opacity: 0.6;
+        transition: all 280ms cubic-bezier(.2,.8,.2,1);
+      }
+      .tile::before { top: -1px; left: -1px; border-top: 2px solid var(--green); border-left: 2px solid var(--green); }
+      .tile::after  { bottom: -1px; right: -1px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
+      .tile .corner-tr { top: -1px; right: -1px; border-top: 2px solid var(--green); border-right: 2px solid var(--green); }
+      .tile .corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid var(--green); border-left: 2px solid var(--green); }
+
+      .tile:hover {
+        border-color: rgba(0,255,136,.35);
+        background: #0d100e;
+        box-shadow: 0 0 0 1px rgba(0,255,136,.25),
+                    0 0 80px rgba(0,255,136,.18),
+                    inset 0 0 60px rgba(0,255,136,.06);
+        transform: translateY(-3px);
+      }
+      .tile:hover::before, .tile:hover::after,
+      .tile:hover > .corner-tr, .tile:hover > .corner-bl {
+        opacity: 1;
+        width: 22px;
+        height: 22px;
+      }
+
+      /* when one tile is hovered, the other dims (using :has) */
+      .tile-grid:has(.tile:hover) .tile:not(:hover) {
+        opacity: 0.32;
+        filter: saturate(0.4);
+      }
+
+      .tile-icon {
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        transition: all 280ms;
+      }
+      .tile:hover .tile-icon {
+        border-color: var(--green);
+        box-shadow: 0 0 24px rgba(0,255,136,.35), inset 0 0 12px rgba(0,255,136,.15);
+      }
+      .tile-icon svg {
+        width: 32px;
+        height: 32px;
+        transition: all 280ms;
+      }
+      .tile:hover .tile-icon svg {
+        filter: drop-shadow(0 0 8px rgba(0,255,136,.6));
+      }
+
+      .tile-tag {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .tile:hover .tile-tag { color: var(--green); }
+
+      .tile-title {
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1;
+        color: var(--text);
+        margin: 0;
+      }
+      .tile:hover .tile-title {
+        color: var(--green);
+        text-shadow: 0 0 24px rgba(0,255,136,.4);
+      }
+
+      .tile-desc {
+        font-size: 0.95rem;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+      .tile:hover .tile-desc { color: #c8c8c8; }
+
+      .tile-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 1.5rem;
+        margin-top: auto;
+        border-top: 1px solid var(--border);
+        font-size: 0.75rem;
+      }
+      .tile:hover .tile-meta { border-color: rgba(0,255,136,.3); }
+      .tile-wallet {
+        color: var(--muted);
+        font-family: inherit;
+      }
+      .tile-cta {
+        color: var(--text);
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        transition: all 240ms;
+      }
+      .tile:hover .tile-cta {
+        color: var(--green);
+        gap: 0.9rem;
+      }
+      .tile-cta .arrow { transition: transform 240ms; }
+      .tile:hover .tile-cta .arrow { transform: translateX(4px); }
+
+      /* topbar wallet pill */
+      .wallet-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.55rem 0.9rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+      }
+      .dot-green {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+      .back-link {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.7rem;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        padding: 0.55rem 0.9rem;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        transition: all 200ms;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .back-link:hover { color: var(--text); border-color: var(--green); }
+
+      .corner {
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        border-color: var(--green);
+        opacity: 0.5;
+      }
+      .corner.tl { top: 20px; left: 20px; border-top: 1px solid; border-left: 1px solid; }
+      .corner.tr { top: 20px; right: 20px; border-top: 1px solid; border-right: 1px solid; }
+      .corner.bl { bottom: 20px; left: 20px; border-bottom: 1px solid; border-left: 1px solid; }
+      .corner.br { bottom: 20px; right: 20px; border-bottom: 1px solid; border-right: 1px solid; }
+
+      /* tile prefix dot */
+      .role-marker {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .role-marker::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        background: var(--muted);
+        display: inline-block;
+      }
+      .tile:hover .role-marker::before { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    </style>
+  </head>
+  <body class="grid-bg">
+    <!-- corner brackets -->
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+
+    <!-- TOPBAR -->
+    <header class="px-10 py-6 flex justify-between items-center fade-in delay-1">
+      <a href="screen-1-cold-open.html" class="back-link">
+        <span>◀</span>
+        <span>BACK</span>
+      </a>
+      <div class="flex items-center gap-3">
+        <div class="wallet-pill">
+          <span class="dot-green"></span>
+          <span class="stamp stamp-bright">CONNECTED</span>
+          <span class="text-xs text-[var(--muted)]">·</span>
+          <span class="text-xs text-[var(--text)]">7xK4...3pQ2</span>
+          <span class="text-xs text-[var(--muted)]">·</span>
+          <span class="text-xs text-[var(--green)] glow-green">12.40 SOL</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="max-w-6xl mx-auto px-6 py-8">
+      <!-- step indicator -->
+      <div class="stamp mb-6 fade-in delay-2">
+        STEP 02 OF 04 · IDENTITY SELECT
+      </div>
+
+      <!-- prompt -->
+      <div class="mb-10 fade-in delay-2">
+        <h1 class="prompt-line"><span class="pf">&gt;</span> IDENTIFY YOURSELF.<span class="text-[var(--green)] blink">_</span></h1>
+        <p class="text-[var(--muted)] mt-3 text-sm md:text-base">
+          The same wallet can play either role. Pick the one for this session.
+        </p>
+      </div>
+
+      <!-- the two tiles -->
+      <div class="tile-grid mb-12">
+        <!-- OWNER TILE -->
+        <a href="#" onclick="select('owner');return false;" class="tile slide-from-left" style="animation-delay:300ms">
+          <span class="corner-tr"></span>
+          <span class="corner-bl"></span>
+
+          <div class="flex items-start justify-between">
+            <div class="tile-icon">
+              <!-- key + clock icon -->
+              <svg viewBox="0 0 32 32" fill="none" stroke="#00FF88" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="16" r="5" />
+                <circle cx="11" cy="16" r="1.2" fill="#00FF88" stroke="none" />
+                <path d="M16 16 H28" />
+                <path d="M24 16 v4" />
+                <path d="M28 16 v4" />
+              </svg>
+            </div>
+            <span class="role-marker">ROLE / A</span>
+          </div>
+
+          <div>
+            <div class="tile-tag mb-3">> MODE</div>
+            <h2 class="tile-title">OWNER</h2>
+          </div>
+
+          <p class="tile-desc">
+            I want to lock SOL behind my own continued check-in.<br/>
+            If I go silent, the funds release to a beneficiary I choose.
+          </p>
+
+          <ul class="text-xs text-[var(--muted)] space-y-1.5 leading-relaxed">
+            <li><span class="text-[var(--green)]">▸</span> Initialize a new vault</li>
+            <li><span class="text-[var(--green)]">▸</span> Check in on your schedule</li>
+            <li><span class="text-[var(--green)]">▸</span> Cancel anytime (you keep the keys)</li>
+          </ul>
+
+          <div class="tile-meta">
+            <span class="tile-wallet">SIGNS AS &nbsp;7xK4...3pQ2</span>
+            <span class="tile-cta">
+              SELECT <span class="arrow">▶▶</span>
+            </span>
+          </div>
+        </a>
+
+        <!-- BENEFICIARY TILE -->
+        <a href="#" onclick="select('beneficiary');return false;" class="tile slide-from-right" style="animation-delay:450ms">
+          <span class="corner-tr"></span>
+          <span class="corner-bl"></span>
+
+          <div class="flex items-start justify-between">
+            <div class="tile-icon">
+              <!-- watching eye icon -->
+              <svg viewBox="0 0 32 32" fill="none" stroke="#00FF88" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 16 C 6 8 11 6 16 6 C 21 6 26 8 30 16 C 26 24 21 26 16 26 C 11 26 6 24 2 16 Z" />
+                <circle cx="16" cy="16" r="5" />
+                <circle cx="16" cy="16" r="1.8" fill="#00FF88" stroke="none" />
+              </svg>
+            </div>
+            <span class="role-marker">ROLE / B</span>
+          </div>
+
+          <div>
+            <div class="tile-tag mb-3">> MODE</div>
+            <h2 class="tile-title">BENEFICIARY</h2>
+          </div>
+
+          <p class="tile-desc">
+            Someone locked SOL with me as the heir.<br/>
+            I'm here to watch their countdown — and claim when it hits zero.
+          </p>
+
+          <ul class="text-xs text-[var(--muted)] space-y-1.5 leading-relaxed">
+            <li><span class="text-[var(--green)]">▸</span> Look up a vault by owner address</li>
+            <li><span class="text-[var(--green)]">▸</span> See the live countdown until claimable</li>
+            <li><span class="text-[var(--green)]">▸</span> Claim the funds when the time elapses</li>
+          </ul>
+
+          <div class="tile-meta">
+            <span class="tile-wallet">SIGNS AS &nbsp;7xK4...3pQ2</span>
+            <span class="tile-cta">
+              SELECT <span class="arrow">▶▶</span>
+            </span>
+          </div>
+        </a>
+      </div>
+
+      <!-- footer line -->
+      <div class="text-center fade-in delay-5">
+        <p class="stamp">
+          you can switch roles later · &nbsp;[ 1 ] OWNER &nbsp;·&nbsp; [ 2 ] BENEFICIARY &nbsp;·&nbsp; [ ESC ] BACK
+        </p>
+      </div>
+    </main>
+
+    <script>
+      function select(role) {
+        // mockup-only: flash a "loading next screen" overlay and alert
+        const overlay = document.createElement("div");
+        overlay.style.cssText = `
+          position: fixed; inset: 0; background: rgba(0,0,0,.85);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 200; flex-direction: column; gap: 1rem;
+          font-family: "JetBrains Mono", monospace;
+          color: #00FF88;
+        `;
+        overlay.innerHTML = `
+          <div style="font-size: 0.65rem; letter-spacing: 0.32em; opacity: 0.6">
+            LOADING MODE
+          </div>
+          <div style="font-size: 2.5rem; font-weight: 900; letter-spacing: -.02em; text-shadow: 0 0 24px rgba(0,255,136,.6)">
+            ${role.toUpperCase()}<span style="animation: blink 1s infinite">_</span>
+          </div>
+          <div style="font-size: 0.7rem; opacity: 0.5; margin-top: 1rem">
+            (screen 3 not built yet — next mockup)
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "1") select("owner");
+        else if (e.key === "2") select("beneficiary");
+        else if (e.key === "Escape") window.location.href = "screen-1-cold-open.html";
+      });
+    </script>
+  </body>
+</html>

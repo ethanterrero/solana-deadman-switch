@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
       rel="stylesheet"
     />
     <style>
@@ -17,125 +17,245 @@
         background: #0c0c0f;
         color: #e8e8e8;
       }
+      .mono { font-family: "JetBrains Mono", monospace; }
       .card {
         background: #16161a;
         border: 1px solid #26262c;
         transition: all 200ms ease;
+        display: block;
+        text-decoration: none;
+        color: inherit;
       }
       .card:hover {
         border-color: #3a3a44;
         transform: translateY(-2px);
       }
+      .card.chosen { border-color: #00ff88; box-shadow: 0 0 0 1px #00ff88, 0 0 40px rgba(0,255,136,.15); }
+      .card.dimmed { opacity: 0.45; filter: saturate(0.5); }
+      .card.dimmed:hover { opacity: 1; filter: saturate(1); }
       .swatch {
         width: 22px;
         height: 22px;
         border-radius: 999px;
         border: 1px solid rgba(255, 255, 255, 0.15);
       }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.25rem 0.6rem;
+        font-size: 0.65rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-weight: 700;
+        border-radius: 999px;
+      }
+      .chip-green { background: rgba(0,255,136,.12); color: #00ff88; border: 1px solid rgba(0,255,136,.3); }
+      .chip-muted { background: rgba(255,255,255,.04); color: #999; border: 1px solid rgba(255,255,255,.08); }
+      .chip-amber { background: rgba(255,176,32,.12); color: #ffb020; border: 1px solid rgba(255,176,32,.3); }
+      .section-rule {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 3rem 0 1.5rem;
+      }
+      .section-rule .line {
+        flex: 1;
+        height: 1px;
+        background: #26262c;
+      }
+      .step-num {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        font-size: 0.7rem;
+        color: #00ff88;
+        background: #0c0c0f;
+        border: 1px solid #00ff88;
+        border-radius: 4px;
+        padding: 0.15rem 0.45rem;
+        margin-right: 0.6rem;
+      }
+      .step-num.todo {
+        color: #555;
+        border-color: #333;
+      }
+      .arrow {
+        opacity: 0.4;
+      }
+      .card:hover .arrow { opacity: 1; }
     </style>
   </head>
   <body class="min-h-screen">
     <div class="max-w-5xl mx-auto px-6 py-12">
+      <!-- HEADER -->
       <div class="mb-10">
-        <div
-          class="text-xs uppercase tracking-[0.25em] text-neutral-500 mb-2"
-        >
-          Step 1 · pick a direction
+        <div class="text-xs uppercase tracking-[0.25em] text-neutral-500 mb-2 mono">
+          Design Workspace
         </div>
         <h1 class="text-3xl font-bold mb-2">
-          Dead Man's Switch — Frontend Design
+          Dead Man's Switch — Frontend
         </h1>
         <p class="text-neutral-400 max-w-2xl">
-          Three full-fidelity mockups. Same data, same screen, same
-          LOCKED↔CLAIMABLE flip. Click into each, toggle the state at the top
-          of the page, decide which one to scaffold the React app from.
+          Click into any mockup. All wizard screens link to each other —
+          you can walk through the demo flow end-to-end as it gets built out.
         </p>
       </div>
 
-      <div class="grid md:grid-cols-3 gap-5">
-        <!-- A -->
-        <a href="a-terminal-vault.html" class="card p-6 rounded-2xl block">
-          <div
-            class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2"
-          >
-            Direction A
+      <!-- CHOSEN DIRECTION -->
+      <div class="section-rule">
+        <span class="chip chip-green">✓ CHOSEN DIRECTION</span>
+        <span class="line"></span>
+      </div>
+
+      <a href="a-terminal-vault.html" class="card chosen p-6 rounded-2xl block mb-8">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-1 mono">
+              Direction A
+            </div>
+            <h2 class="text-2xl font-bold">Terminal Vault</h2>
           </div>
-          <h2 class="text-xl font-bold mb-1">Terminal Vault</h2>
-          <p class="text-sm text-neutral-400 mb-4">
-            Bloomberg × Solana explorer. Black, electric green, scanlines, all
-            JetBrains Mono. Reads as raw infrastructure.
+          <span class="chip chip-green mono">A</span>
+        </div>
+        <p class="text-sm text-neutral-400 mb-4 max-w-2xl">
+          Bloomberg × Solana explorer. Black, electric green, scanlines, all
+          JetBrains Mono. Original single-page mockup with the LOCKED↔CLAIMABLE toggle.
+        </p>
+        <div class="flex gap-2">
+          <span class="swatch" style="background:#000"></span>
+          <span class="swatch" style="background:#00FF88"></span>
+          <span class="swatch" style="background:#FFB020"></span>
+          <span class="swatch" style="background:#FF3355"></span>
+        </div>
+      </a>
+
+      <!-- CINEMATIC WIZARD SCREENS -->
+      <div class="section-rule">
+        <span class="chip chip-amber mono">▶ CINEMATIC WIZARD — IN PROGRESS</span>
+        <span class="line"></span>
+      </div>
+
+      <p class="text-sm text-neutral-400 mb-5 max-w-2xl">
+        Each screen is full-bleed and self-contained. The demo flow walks through
+        them in order. <span class="text-emerald-400">Screen 1 → Screen 2</span> is wired up via the INITIATE button.
+      </p>
+
+      <div class="grid md:grid-cols-2 gap-5">
+        <!-- Screen 1 -->
+        <a href="screen-1-cold-open.html" class="card p-6 rounded-2xl">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="step-num">01</span>
+              <span class="text-xs uppercase tracking-widest text-neutral-500 mono">Cold open</span>
+            </div>
+            <span class="text-emerald-400 arrow">▶▶</span>
+          </div>
+          <h3 class="text-lg font-bold mb-2">Landing / Manifesto</h3>
+          <p class="text-sm text-neutral-400 mb-2">
+            Vault glyph, big title with chromatic shadow, typewriter manifesto,
+            INITIATE CTA. Pre-wallet.
           </p>
-          <div class="flex gap-2 mb-4">
-            <span class="swatch" style="background:#000"></span>
-            <span class="swatch" style="background:#00FF88"></span>
-            <span class="swatch" style="background:#FFB020"></span>
-            <span class="swatch" style="background:#FF3355"></span>
-          </div>
-          <div
-            class="text-xs text-neutral-500 flex justify-between border-t border-neutral-800 pt-3"
-          >
-            <span>Risk: medium</span>
-            <span>JetBrains Mono</span>
+          <div class="text-xs text-neutral-500 mt-3 mono">
+            press [ space ] to skip intro · [ enter ] to advance
           </div>
         </a>
 
-        <!-- B -->
-        <a href="b-obsidian-glass.html" class="card p-6 rounded-2xl block">
-          <div
-            class="text-[10px] uppercase tracking-widest text-amber-400 mb-2"
-          >
-            Direction B · recommended
+        <!-- Screen 2 -->
+        <a href="screen-2-identify.html" class="card p-6 rounded-2xl">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="step-num">02</span>
+              <span class="text-xs uppercase tracking-widest text-neutral-500 mono">Identify</span>
+            </div>
+            <span class="text-emerald-400 arrow">▶▶</span>
           </div>
-          <h2 class="text-xl font-bold mb-1">Obsidian Glass</h2>
-          <p class="text-sm text-neutral-400 mb-4">
-            Premium dark dApp. Midnight blue, frosted glass, gold trust +
-            violet action. Polished, hackathon-safe.
+          <h3 class="text-lg font-bold mb-2">Role select — Owner vs Beneficiary</h3>
+          <p class="text-sm text-neutral-400 mb-2">
+            Two giant tiles. Hovering one dims the other. Hard binary choice,
+            no back button needed.
           </p>
-          <div class="flex gap-2 mb-4">
+          <div class="text-xs text-neutral-500 mt-3 mono">
+            [ 1 ] owner · [ 2 ] beneficiary · [ esc ] back
+          </div>
+        </a>
+
+        <!-- Screen 3 — placeholder -->
+        <div class="card p-6 rounded-2xl opacity-40 cursor-not-allowed">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="step-num todo">03</span>
+              <span class="text-xs uppercase tracking-widest text-neutral-500 mono">Arm the vault</span>
+            </div>
+            <span class="text-neutral-600">·</span>
+          </div>
+          <h3 class="text-lg font-bold mb-2">Owner wizard (4 steps)</h3>
+          <p class="text-sm text-neutral-400">
+            Beneficiary → interval → amount → the oath (signing screen).
+          </p>
+          <div class="text-xs text-neutral-600 mt-3 mono">not built yet</div>
+        </div>
+
+        <!-- Screen 4 — placeholder -->
+        <div class="card p-6 rounded-2xl opacity-40 cursor-not-allowed">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="step-num todo">04</span>
+              <span class="text-xs uppercase tracking-widest text-neutral-500 mono">Live cockpit</span>
+            </div>
+            <span class="text-neutral-600">·</span>
+          </div>
+          <h3 class="text-lg font-bold mb-2">Owner — active vault</h3>
+          <p class="text-sm text-neutral-400">
+            Full-bleed countdown, CHECK_IN hero CTA, cancel escape hatch.
+          </p>
+          <div class="text-xs text-neutral-600 mt-3 mono">not built yet</div>
+        </div>
+
+        <!-- Screen 5 — placeholder -->
+        <div class="card p-6 rounded-2xl opacity-40 cursor-not-allowed md:col-span-2">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="step-num todo">05</span>
+              <span class="text-xs uppercase tracking-widest text-neutral-500 mono">Watch + claim</span>
+            </div>
+            <span class="text-neutral-600">·</span>
+          </div>
+          <h3 class="text-lg font-bold mb-2">Beneficiary — watching the countdown</h3>
+          <p class="text-sm text-neutral-400">
+            Enter owner address → full-bleed THEIR countdown (your countdown) →
+            background floods green at 00:00 → CLAIM unlocks.
+          </p>
+          <div class="text-xs text-neutral-600 mt-3 mono">not built yet</div>
+        </div>
+      </div>
+
+      <!-- ALTERNATIVES -->
+      <div class="section-rule">
+        <span class="chip chip-muted">other directions (not chosen)</span>
+        <span class="line"></span>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-5">
+        <a href="b-obsidian-glass.html" class="card dimmed p-5 rounded-2xl">
+          <div class="text-[10px] uppercase tracking-widest text-amber-400 mb-1 mono">Direction B</div>
+          <h3 class="text-base font-bold mb-2">Obsidian Glass</h3>
+          <div class="flex gap-2">
             <span class="swatch" style="background:#0A0E27"></span>
             <span class="swatch" style="background:#F59E0B"></span>
             <span class="swatch" style="background:#8B5CF6"></span>
             <span class="swatch" style="background:#10B981"></span>
           </div>
-          <div
-            class="text-xs text-neutral-500 flex justify-between border-t border-neutral-800 pt-3"
-          >
-            <span>Risk: low</span>
-            <span>Orbitron + Exo 2</span>
-          </div>
         </a>
-
-        <!-- C -->
-        <a href="c-brutalist-deaddrop.html" class="card p-6 rounded-2xl block">
-          <div
-            class="text-[10px] uppercase tracking-widest text-red-400 mb-2"
-          >
-            Direction C
-          </div>
-          <h2 class="text-xl font-bold mb-1">Brutalist Dead-Drop</h2>
-          <p class="text-sm text-neutral-400 mb-4">
-            Anti-design. Paper + ink, oversized mono, hard shadows, no
-            transitions. Most memorable, most divisive.
-          </p>
-          <div class="flex gap-2 mb-4">
+        <a href="c-brutalist-deaddrop.html" class="card dimmed p-5 rounded-2xl">
+          <div class="text-[10px] uppercase tracking-widest text-red-400 mb-1 mono">Direction C</div>
+          <h3 class="text-base font-bold mb-2">Brutalist Dead-Drop</h3>
+          <div class="flex gap-2">
             <span class="swatch" style="background:#F5F3EA"></span>
             <span class="swatch" style="background:#050505"></span>
             <span class="swatch" style="background:#FF2D2D"></span>
             <span class="swatch" style="background:#FFE600"></span>
           </div>
-          <div
-            class="text-xs text-neutral-500 flex justify-between border-t border-neutral-800 pt-3"
-          >
-            <span>Risk: high reward / high risk</span>
-            <span>Space Mono</span>
-          </div>
         </a>
-      </div>
-
-      <div class="mt-10 text-xs text-neutral-500">
-        Each mockup has a <code class="text-neutral-300">[LOCKED]</code> /
-        <code class="text-neutral-300">[CLAIMABLE]</code> toggle at the top —
-        click to preview the state flip you'll demo on stage.
       </div>
     </div>
   </body>

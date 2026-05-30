@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Screen 1 — Cold Open · Dead Man's Switch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #000000;
+        --panel: #0a0a0a;
+        --border: #1f1f1f;
+        --green: #00ff88;
+        --green-dim: #00aa5a;
+        --amber: #ffb020;
+        --red: #ff3355;
+        --text: #e8e8e8;
+        --muted: #6a6a6a;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      /* CRT scanlines */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.025) 0px,
+          rgba(255, 255, 255, 0.025) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        pointer-events: none;
+        z-index: 100;
+        mix-blend-mode: overlay;
+      }
+      /* subtle grid */
+      .grid-bg {
+        background-image: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          );
+        background-size: 40px 40px;
+      }
+      /* vignette darkens the edges, focuses the eye */
+      .vignette::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 0%,
+          transparent 45%,
+          rgba(0, 0, 0, 0.9) 100%
+        );
+        z-index: 50;
+      }
+
+      .glow-green { text-shadow: 0 0 12px rgba(0,255,136,.7), 0 0 32px rgba(0,255,136,.35); }
+      .glow-amber { text-shadow: 0 0 12px rgba(255,176,32,.7), 0 0 32px rgba(255,176,32,.35); }
+      .glow-red   { text-shadow: 0 0 12px rgba(255,51,85,.85), 0 0 32px rgba(255,51,85,.4); }
+
+      .blink { animation: blink 1.2s steps(2, jump-none) infinite; }
+      .blink-slow { animation: blink 2.2s steps(2, jump-none) infinite; }
+      @keyframes blink { 50% { opacity: 0.18; } }
+
+      .fade-in { animation: fadeIn 700ms cubic-bezier(.2,.7,.2,1) forwards; opacity: 0; }
+      @keyframes fadeIn { to { opacity: 1; } }
+      .delay-1 { animation-delay: 100ms; }
+      .delay-2 { animation-delay: 400ms; }
+      .delay-3 { animation-delay: 900ms; }
+      .delay-4 { animation-delay: 1400ms; }
+      .delay-5 { animation-delay: 4800ms; }
+
+      /* center vault glyph */
+      .glyph-vault {
+        width: clamp(120px, 14vw, 168px);
+        height: clamp(120px, 14vw, 168px);
+        position: relative;
+      }
+      .glyph-vault svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(0 0 24px rgba(0,255,136,.45))
+                drop-shadow(0 0 64px rgba(0,255,136,.25));
+      }
+      .rotate-slow { transform-origin: 50% 50%; animation: rotate 22s linear infinite; }
+      .rotate-rev  { transform-origin: 50% 50%; animation: rotate 36s linear infinite reverse; }
+      @keyframes rotate { to { transform: rotate(360deg); } }
+
+      /* title with chromatic-shadow */
+      .title {
+        font-weight: 900;
+        letter-spacing: -0.045em;
+        font-size: clamp(2.6rem, 9.5vw, 9rem);
+        line-height: 0.88;
+        color: var(--text);
+        margin: 0;
+        text-shadow: 0 0 32px rgba(255,255,255,.08);
+      }
+      .title-shadow {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        color: var(--green);
+        opacity: 0.32;
+        z-index: -1;
+        filter: blur(.5px);
+      }
+
+      .stamp {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .stamp-amber { color: var(--amber); }
+
+      /* typewriter manifesto */
+      #manifesto {
+        min-height: 168px;
+        text-align: left;
+        display: inline-block;
+      }
+      .typewriter-line {
+        font-size: 1rem;
+        color: var(--muted);
+        font-weight: 400;
+        min-height: 1.5em;
+        line-height: 1.55;
+      }
+      .typewriter-line .cursor {
+        display: inline-block;
+        width: 0.55em;
+        height: 1.1em;
+        background: var(--green);
+        vertical-align: -2px;
+        margin-left: 2px;
+        animation: blink 0.9s steps(2) infinite;
+        box-shadow: 0 0 12px rgba(0,255,136,.6);
+      }
+      .typewriter-line.done .cursor { display: none; }
+      .typewriter-line.done .prefix { color: var(--green); }
+      .typewriter-line.done .text { color: var(--text); }
+
+      /* big CTA */
+      .cta {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        padding: 1.25rem 3.25rem;
+        border: 2px solid var(--green);
+        background: transparent;
+        color: var(--green);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 240ms cubic-bezier(.2,.8,.2,1);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 1rem;
+        position: relative;
+        box-shadow: 0 0 0 rgba(0,255,136,0);
+      }
+      .cta::before, .cta::after {
+        content: "";
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--green);
+      }
+      .cta::before { top: -8px; left: -8px; border-right: 0; border-bottom: 0; }
+      .cta::after  { bottom: -8px; right: -8px; border-left: 0; border-top: 0; }
+      .cta:hover {
+        background: var(--green);
+        color: #000;
+        box-shadow: 0 0 60px rgba(0,255,136,.55),
+                    inset 0 0 24px rgba(255,255,255,.2);
+        letter-spacing: 0.26em;
+      }
+      .cta .arrow { display: inline-block; transition: transform 200ms ease; }
+      .cta:hover .arrow { transform: translateX(8px); }
+
+      .corner {
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        border-color: var(--green);
+        opacity: 0.5;
+      }
+      .corner.tl { top: 20px; left: 20px; border-top: 1px solid; border-left: 1px solid; }
+      .corner.tr { top: 20px; right: 20px; border-top: 1px solid; border-right: 1px solid; }
+      .corner.bl { bottom: 20px; left: 20px; border-bottom: 1px solid; border-left: 1px solid; }
+      .corner.br { bottom: 20px; right: 20px; border-bottom: 1px solid; border-right: 1px solid; }
+    </style>
+  </head>
+  <body class="grid-bg vignette">
+    <!-- corner brackets -->
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+
+    <!-- top header -->
+    <header class="absolute top-0 left-0 right-0 px-10 py-6 flex justify-between items-center z-10">
+      <div class="flex items-center gap-3 fade-in delay-1">
+        <div class="w-2 h-2 rounded-full bg-[var(--green)] glow-green blink"></div>
+        <span class="stamp">DEADMAN_SWITCH · v0.1 · DEVNET</span>
+      </div>
+      <div class="stamp fade-in delay-1">SOLANA :: PROGRAM 6gbT...fFu</div>
+    </header>
+
+    <!-- bottom system info -->
+    <footer class="absolute bottom-0 left-0 right-0 px-10 py-6 flex justify-between items-center z-10 fade-in delay-5">
+      <span class="stamp">SLOT 312,094,221 · RPC api.devnet.solana.com</span>
+      <span class="stamp">[ ENTER ] OR CLICK ▶ TO PROCEED</span>
+      <span class="stamp stamp-amber blink-slow">▮ READY</span>
+    </footer>
+
+    <!-- MAIN STAGE -->
+    <main class="min-h-screen flex flex-col items-center justify-center px-6 relative py-24">
+      <!-- vault glyph -->
+      <div class="glyph-vault mb-10 fade-in delay-2">
+        <svg viewBox="0 0 100 100" fill="none">
+          <!-- outer ring + slow rotating ticks -->
+          <circle cx="50" cy="50" r="46" stroke="#00FF88" stroke-width="0.6" opacity="0.35" />
+          <g class="rotate-slow" stroke="#00FF88" stroke-width="0.7" opacity="0.55">
+            <line x1="50" y1="2" x2="50" y2="11" />
+            <line x1="50" y1="89" x2="50" y2="98" />
+            <line x1="2"  y1="50" x2="11" y2="50" />
+            <line x1="89" y1="50" x2="98" y2="50" />
+            <line x1="16" y1="16" x2="22" y2="22" />
+            <line x1="78" y1="78" x2="84" y2="84" />
+            <line x1="78" y1="22" x2="84" y2="16" />
+            <line x1="16" y1="84" x2="22" y2="78" />
+          </g>
+          <!-- mid ring + reverse rotating dashes -->
+          <circle cx="50" cy="50" r="38" stroke="#00FF88" stroke-width="0.8" opacity="0.5" stroke-dasharray="2 6" class="rotate-rev" style="transform-origin: 50% 50%;" />
+          <!-- inner ring -->
+          <circle cx="50" cy="50" r="30" stroke="#00FF88" stroke-width="1" opacity="0.85" />
+          <!-- lock body -->
+          <g stroke="#00FF88" stroke-width="1.4" fill="none" stroke-linejoin="round">
+            <rect x="40" y="46" width="20" height="18" rx="1" />
+            <path d="M44 46 v-5 a6 6 0 0 1 12 0 v5" />
+            <circle cx="50" cy="55" r="2.2" fill="#00FF88" />
+            <line x1="50" y1="55.5" x2="50" y2="60" stroke-width="1.8" />
+          </g>
+        </svg>
+      </div>
+
+      <!-- subtitle (above title) -->
+      <div class="stamp glow-green text-[var(--green)] mb-5 fade-in delay-2">
+        A TRUSTLESS INHERITANCE PROTOCOL · ON SOLANA
+      </div>
+
+      <!-- title with chromatic shadow -->
+      <div class="relative fade-in delay-3 mb-7 text-center">
+        <h1 class="title relative z-10">
+          DEAD MAN'S<br />SWITCH<span class="text-[var(--green)] blink">_</span>
+        </h1>
+        <h1 class="title title-shadow" aria-hidden="true">
+          DEAD MAN'S<br />SWITCH
+        </h1>
+      </div>
+
+      <!-- ominous tagline -->
+      <div class="stamp stamp-amber glow-amber text-sm md:text-base mb-12 fade-in delay-4 text-center">
+        ◇&nbsp;&nbsp;TIME IS THE ONLY ENFORCER&nbsp;&nbsp;◇
+      </div>
+
+      <!-- typewriter manifesto -->
+      <div class="mb-14 text-center">
+        <div id="manifesto" class="space-y-1.5"></div>
+      </div>
+
+      <!-- CTA -->
+      <a id="cta" href="screen-2-identify.html" class="cta opacity-0">
+        <span>INITIATE</span>
+        <span class="arrow">▶▶</span>
+      </a>
+
+      <!-- skip hint -->
+      <div class="stamp mt-8 opacity-0 fade-in delay-5">
+        press [ space ] to skip intro
+      </div>
+    </main>
+
+    <script>
+      const lines = [
+        { prefix: "> ", text: "No custodian." },
+        { prefix: "> ", text: "No keeper bot." },
+        { prefix: "> ", text: "No backdoor." },
+        { prefix: "> ", text: "Only code. Only time." },
+      ];
+
+      const target = document.getElementById("manifesto");
+      const cta = document.getElementById("cta");
+
+      function typeLine({ prefix, text }) {
+        return new Promise((resolve) => {
+          const div = document.createElement("div");
+          div.className = "typewriter-line";
+          div.innerHTML = `<span class="prefix">${prefix}</span><span class="text"></span><span class="cursor"></span>`;
+          target.appendChild(div);
+          const textEl = div.querySelector(".text");
+          let i = 0;
+          const interval = setInterval(() => {
+            textEl.textContent = text.slice(0, i);
+            i++;
+            if (i > text.length) {
+              clearInterval(interval);
+              div.classList.add("done");
+              resolve();
+            }
+          }, 22);
+        });
+      }
+
+      function revealCTA() {
+        cta.style.transition = "opacity 700ms ease, transform 700ms ease";
+        cta.style.opacity = "1";
+      }
+
+      async function run() {
+        await new Promise((r) => setTimeout(r, 1700));
+        for (const line of lines) {
+          await typeLine(line);
+          await new Promise((r) => setTimeout(r, 180));
+        }
+        revealCTA();
+      }
+      run();
+
+      let skipped = false;
+      function skip() {
+        if (skipped) return;
+        skipped = true;
+        target.innerHTML = lines
+          .map(
+            (l) =>
+              `<div class="typewriter-line done"><span class="prefix">${l.prefix}</span><span class="text">${l.text}</span></div>`
+          )
+          .join("");
+        revealCTA();
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          window.location.href = "screen-2-identify.html";
+        } else if (e.key === " " || e.code === "Space") {
+          e.preventDefault();
+          skip();
+        }
+      });
+    </script>
+  </body>
+</html>
