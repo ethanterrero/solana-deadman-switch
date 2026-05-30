@@ -674,6 +674,47 @@
       .modal-channel.on .pip-mini { background: rgba(0,255,136,.2); border-color: var(--green); }
       .modal-channel.on .pip-mini::after { left: 13px; background: var(--green); box-shadow: 0 0 6px var(--green); }
 
+      /* Interactive per-channel toggle (cockpit modal) */
+      .modal-channel { cursor: pointer; transition: all 200ms; }
+      .modal-channel:hover { border-color: rgba(0, 255, 136, 0.25); }
+      .modal-channel-field {
+        margin-top: 0.5rem;
+        background: #050505;
+        border: 1px solid var(--border);
+        padding: 0.6rem 0.85rem;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--text);
+        width: 100%;
+        font-size: 0.85rem;
+        outline: none;
+        transition: all 180ms;
+      }
+      .modal-channel-field:focus { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+      .modal-channel.off .modal-channel-field { opacity: 0.5; pointer-events: none; }
+      .modal-channel-body { padding: 0 0.75rem 0 calc(18px + 80px + 0.85rem); margin-top: -0.25rem; }
+      @media (max-width: 480px) {
+        .modal-channel-body { padding-left: 0; }
+      }
+
+      /* === New unlock-at preview (EDIT CONFIG modal) === */
+      .preview-line {
+        margin-top: 0.6rem;
+        padding: 0.6rem 0.85rem;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-left: 2px solid var(--green);
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-family: "JetBrains Mono", monospace;
+        line-height: 1.5;
+      }
+      .preview-line .lbl { color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; font-size: 0.65rem; }
+      .preview-line .val { color: var(--green); font-weight: 600; margin-left: 0.5rem; }
+      .preview-line.danger { border-left-color: var(--red); }
+      .preview-line.danger .val { color: var(--red); }
+      .preview-line .delta { color: var(--muted); margin-left: 0.5rem; font-size: 0.7rem; }
+      .preview-line .warn-extra { display: block; margin-top: 0.4rem; color: var(--red); font-size: 0.72rem; }
+
       /* === ACCESSIBILITY === */
 
       /* Visible focus rings for keyboard users — hidden for mouse-only */
@@ -922,7 +963,13 @@
           </div>
           <div>
             <label class="modal-label">NEW INTERVAL · DAYS (CURRENT: 30)</label>
-            <input class="modal-field" id="cfg-int" type="number" min="1" placeholder="leave blank to keep current" />
+            <input class="modal-field" id="cfg-int" type="number" min="1" placeholder="leave blank to keep current" oninput="previewNewUnlockAt()" />
+            <div class="preview-line" id="cfg-int-preview" style="display:none">
+              <span class="lbl">NEW UNLOCK_AT:</span>
+              <span class="val" id="cfg-int-preview-val">—</span>
+              <span class="delta" id="cfg-int-preview-delta"></span>
+              <span class="warn-extra" id="cfg-int-preview-warn"></span>
+            </div>
           </div>
           <div class="modal-warning">
             <strong>⚠ careful:</strong> if you shorten the interval below
@@ -950,19 +997,37 @@
           </p>
         </div>
         <div class="modal-body">
-          <div class="modal-label">CHANNELS</div>
+          <div class="modal-label">CHANNELS · toggle each independently</div>
           <div class="modal-channels">
-            <div class="modal-channel" id="rem-mc-email">
-              <span class="ic">✉</span>
+            <!-- EMAIL -->
+            <div class="modal-channel" id="rem-mc-email" onclick="toggleModalChannel('email', event)">
+              <span class="ic" aria-hidden="true">✉</span>
               <span class="label">EMAIL</span>
               <span class="value" id="rem-mc-email-val">—</span>
-              <span class="pip-mini"></span>
+              <span class="pip-mini" aria-label="Toggle email channel" role="switch"></span>
             </div>
-            <div class="modal-channel" id="rem-mc-tg">
-              <span class="ic">◉</span>
+            <div class="modal-channel-body" id="rem-mc-email-body" style="display:none">
+              <input
+                id="rem-mc-email-input"
+                class="modal-channel-field"
+                type="email"
+                placeholder="owner@example.com"
+              />
+            </div>
+
+            <!-- TELEGRAM -->
+            <div class="modal-channel" id="rem-mc-tg" onclick="toggleModalChannel('telegram', event)">
+              <span class="ic" aria-hidden="true">◉</span>
               <span class="label">TELEGRAM</span>
               <span class="value" id="rem-mc-tg-val">—</span>
-              <span class="pip-mini"></span>
+              <span class="pip-mini" aria-label="Toggle Telegram channel" role="switch"></span>
+            </div>
+            <div class="modal-channel-body" id="rem-mc-tg-body" style="display:none">
+              <input
+                id="rem-mc-tg-input"
+                class="modal-channel-field"
+                placeholder="chat id (DM @deadman_switch_bot first)"
+              />
             </div>
           </div>
 
@@ -1054,8 +1119,10 @@
       // Reminder subscription state (in-memory; in the real app this is server-side via Supabase)
       const subscription = {
         enabled: params.get("rem") === "1",
+        emailEnabled: params.get("rem") === "1" && (params.get("ch") || "").includes("email"),
         email: params.get("rem") === "1" && (params.get("ch") || "").includes("email") ? "owner@example.com" : "",
-        telegram: params.get("rem") === "1" && (params.get("ch") || "").includes("tg") ? "@yourbot · chat 123456789" : "",
+        telegramEnabled: params.get("rem") === "1" && (params.get("ch") || "").includes("tg"),
+        telegram: params.get("rem") === "1" && (params.get("ch") || "").includes("tg") ? "123456789" : "",
         leadSeconds: parseInt(params.get("lead") || "21600"),
         frequencySeconds: parseInt(params.get("freq") || "900"),
       };
@@ -1268,26 +1335,36 @@
         const mcTg = document.getElementById("rem-mc-tg");
         const emailVal = document.getElementById("rem-mc-email-val");
         const tgVal = document.getElementById("rem-mc-tg-val");
+        const emailBody = document.getElementById("rem-mc-email-body");
+        const tgBody = document.getElementById("rem-mc-tg-body");
+        const emailInput = document.getElementById("rem-mc-email-input");
+        const tgInput = document.getElementById("rem-mc-tg-input");
         const status = document.getElementById("rem-modal-status");
         const disableBtn = document.getElementById("rem-disable-btn");
 
-        if (subscription.email) {
-          mcEmail.classList.add("on");
-          emailVal.textContent = subscription.email;
-        } else {
-          mcEmail.classList.remove("on");
-          emailVal.textContent = "not set";
-        }
-        if (subscription.telegram) {
-          mcTg.classList.add("on");
-          tgVal.textContent = subscription.telegram;
-        } else {
-          mcTg.classList.remove("on");
-          tgVal.textContent = "not set";
-        }
+        // Email channel
+        mcEmail.classList.toggle("on", subscription.emailEnabled);
+        mcEmail.classList.toggle("off", !subscription.emailEnabled);
+        emailVal.textContent = subscription.emailEnabled
+          ? (subscription.email || "(set address)")
+          : "off";
+        emailBody.style.display = subscription.emailEnabled ? "block" : "none";
+        emailInput.value = subscription.email || "";
+
+        // Telegram channel
+        mcTg.classList.toggle("on", subscription.telegramEnabled);
+        mcTg.classList.toggle("off", !subscription.telegramEnabled);
+        tgVal.textContent = subscription.telegramEnabled
+          ? (subscription.telegram ? `chat ${subscription.telegram}` : "(set chat id)")
+          : "off";
+        tgBody.style.display = subscription.telegramEnabled ? "block" : "none";
+        tgInput.value = subscription.telegram || "";
+
         document.getElementById("rem-lead").value = subscription.leadSeconds;
         document.getElementById("rem-freq").value = subscription.frequencySeconds;
-        if (subscription.enabled) {
+
+        const anyChannelOn = subscription.emailEnabled || subscription.telegramEnabled;
+        if (subscription.enabled && anyChannelOn) {
           status.textContent = "ENABLED";
           status.className = "green";
           disableBtn.style.display = "inline-block";
@@ -1298,23 +1375,98 @@
         }
       }
 
+      // Per-channel toggle — click anywhere on the channel row OR on the pip to flip
+      function toggleModalChannel(name, event) {
+        // ignore clicks that started inside the input field
+        if (event && event.target && event.target.tagName === "INPUT") return;
+        if (name === "email") subscription.emailEnabled = !subscription.emailEnabled;
+        else if (name === "telegram") subscription.telegramEnabled = !subscription.telegramEnabled;
+        renderRemindersModal();
+      }
+
       function saveReminders() {
+        // pull values from inputs
+        const emailInput = document.getElementById("rem-mc-email-input");
+        const tgInput = document.getElementById("rem-mc-tg-input");
+        if (subscription.emailEnabled) subscription.email = emailInput.value.trim();
+        if (subscription.telegramEnabled) subscription.telegram = tgInput.value.trim();
+
+        // enforce: at-least-one channel required (matches Supabase constraint)
+        if (!subscription.emailEnabled && !subscription.telegramEnabled) {
+          alert("at least one channel (email or telegram) must be enabled — or click DISABLE to mute reminders entirely.");
+          return;
+        }
+
         subscription.enabled = true;
         subscription.leadSeconds = parseInt(document.getElementById("rem-lead").value);
         subscription.frequencySeconds = parseInt(document.getElementById("rem-freq").value);
-        // in real app: POST {switch_pda, owner_pubkey, email, telegram_chat_id, lead_seconds, frequency_seconds, enabled} to /functions/v1/subscribe
+
+        const chanList = [
+          subscription.emailEnabled ? "email" : null,
+          subscription.telegramEnabled ? "telegram" : null,
+        ].filter(Boolean).join(" + ");
+
         closeModal("m-reminders");
         renderReminderChip();
-        showTx("subscribe (off-chain)", `lead ${fmtSeconds(subscription.leadSeconds)} · repeat ${fmtSeconds(subscription.frequencySeconds)}`, () => {
-          pushEvent({ kind: "Subscribed (off-chain)", meta: `lead ${fmtSeconds(subscription.leadSeconds)} · repeat ${fmtSeconds(subscription.frequencySeconds)}`, sig: "supabase", color: "var(--amber)" });
-        }, "var(--amber)");
+        showTx(
+          "subscribe (off-chain)",
+          `${chanList} · lead ${fmtSeconds(subscription.leadSeconds)} · repeat ${fmtSeconds(subscription.frequencySeconds)}`,
+          () => {
+            pushEvent({
+              kind: "Subscribed (off-chain)",
+              meta: `${chanList} · lead ${fmtSeconds(subscription.leadSeconds)}`,
+              sig: "supabase",
+              color: "var(--amber)",
+            });
+          },
+          "var(--amber)"
+        );
       }
 
       function disableReminders() {
         subscription.enabled = false;
+        subscription.emailEnabled = false;
+        subscription.telegramEnabled = false;
         // in real app: POST {switch_pda, owner_pubkey, enabled: false} — mutes by upserting enabled=false
         closeModal("m-reminders");
         renderReminderChip();
+      }
+
+      // === EDIT CONFIG: new unlock_at preview ===
+      // Mockup: last_checkin = "18 days ago" → 2026-05-11T14:23:00Z
+      const LAST_CHECKIN_TS = Date.parse("2026-05-11T14:23:00Z");
+      const NOW_TS_FOR_PREVIEW = Date.parse("2026-05-29T14:23:00Z"); // simulated "now" (18d after)
+      function previewNewUnlockAt() {
+        const input = document.getElementById("cfg-int");
+        const wrap = document.getElementById("cfg-int-preview");
+        const val = document.getElementById("cfg-int-preview-val");
+        const delta = document.getElementById("cfg-int-preview-delta");
+        const warnExtra = document.getElementById("cfg-int-preview-warn");
+        const v = parseInt(input.value);
+        if (!v || v <= 0) {
+          wrap.style.display = "none";
+          return;
+        }
+        const unlockTs = LAST_CHECKIN_TS + v * 86400 * 1000;
+        const unlockDate = new Date(unlockTs);
+        const fmt = unlockDate.toLocaleString("en-US", {
+          month: "short", day: "numeric", year: "numeric",
+          hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false,
+        }) + " UTC";
+        val.textContent = fmt;
+
+        const wouldBeClaimable = unlockTs <= NOW_TS_FOR_PREVIEW;
+        const deltaDays = (unlockTs - NOW_TS_FOR_PREVIEW) / 86400000;
+        if (wouldBeClaimable) {
+          wrap.classList.add("danger");
+          delta.textContent = `${Math.abs(deltaDays).toFixed(1)} days in the past`;
+          warnExtra.textContent = "⚠ vault would become IMMEDIATELY CLAIMABLE on save — CHECK_IN before changing.";
+        } else {
+          wrap.classList.remove("danger");
+          delta.textContent = `${deltaDays.toFixed(1)} days from now`;
+          warnExtra.textContent = "";
+        }
+        wrap.style.display = "block";
       }
 
       // === SHARED TX FLOW OVERLAY ===
