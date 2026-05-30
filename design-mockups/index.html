@@ -131,13 +131,17 @@
 
       <!-- CINEMATIC WIZARD SCREENS -->
       <div class="section-rule">
-        <span class="chip chip-amber mono">▶ CINEMATIC WIZARD — IN PROGRESS</span>
+        <span class="chip chip-amber mono">▶ CINEMATIC WIZARD — OWNER FLOW LIVE</span>
         <span class="line"></span>
       </div>
 
       <p class="text-sm text-neutral-400 mb-5 max-w-2xl">
         Each screen is full-bleed and self-contained. The demo flow walks through
-        them in order. <span class="text-emerald-400">Screen 1 → Screen 2</span> is wired up via the INITIATE button.
+        them in order. Wired to the new backend: <span class="text-emerald-400">events</span>,
+        <span class="text-emerald-400">deposit</span>,
+        <span class="text-emerald-400">update_config</span>, and
+        <span class="text-amber-400">Supabase reminders</span>
+        (<code class="text-emerald-400">/functions/v1/subscribe</code>).
       </p>
 
       <div class="grid md:grid-cols-2 gap-5">
@@ -188,13 +192,14 @@
             </div>
             <span class="text-emerald-400 arrow">▶▶</span>
           </div>
-          <h3 class="text-lg font-bold mb-2">Owner wizard — 4 sub-steps</h3>
+          <h3 class="text-lg font-bold mb-2">Owner wizard — <span class="text-emerald-400">5 sub-steps</span></h3>
           <p class="text-sm text-neutral-400 mb-2">
-            Beneficiary → interval → amount → the oath. Internal state machine,
-            progress bar, summary chips accumulate, ENTER to advance.
+            Beneficiary → interval → amount → oath (on-chain init) →
+            <span class="text-amber-400">reminders (off-chain Supabase)</span>.
+            Internal state machine, progress bar, summary chips accumulate.
           </p>
           <div class="text-xs text-neutral-500 mt-3 mono">
-            [ enter ] next · [ esc ] back · presets for interval/amount
+            [ enter ] next · [ esc ] back · channel toggles · cadence presets
           </div>
         </a>
 
@@ -207,13 +212,17 @@
             </div>
             <span class="text-emerald-400 arrow">▶▶</span>
           </div>
-          <h3 class="text-lg font-bold mb-2">Owner — active vault (demo centerpiece)</h3>
+          <h3 class="text-lg font-bold mb-2">Owner — active vault</h3>
           <p class="text-sm text-neutral-400 mb-2">
-            Massive countdown ticks every second. Hero CHECK_IN button.
-            Auto-escalates: amber → orange → red as time runs out.
+            Massive countdown ticks every second. Hero CHECK_IN + secondary actions:
+            <span class="text-emerald-400">DEPOSIT</span> ·
+            <span class="text-emerald-400">EDIT CONFIG</span> ·
+            <span class="text-amber-400">REMINDERS</span>. Activity log uses real
+            event names (<span class="text-emerald-400">CheckedIn</span>,
+            <span class="text-emerald-400">Deposited</span>, …).
           </p>
           <div class="text-xs text-neutral-500 mt-3 mono">
-            [ space ] check_in · [ 1-4 ] preview states (active/warn/crit/expired)
+            [ space ] check_in · [ 1-4 ] preview states · [ esc ] close modal
           </div>
         </a>
 

@@ -415,6 +415,263 @@
       body.state-expired .hero-cta::before, body.state-expired .hero-cta::after {
         border-color: var(--muted);
       }
+
+      /* === SECONDARY ACTION ROW (deposit / update_config / reminders) === */
+      .secondary-row {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 2rem;
+      }
+      .sec-btn {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        padding: 0.75rem 1.4rem;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 200ms;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+      .sec-btn:hover { border-color: var(--green); color: var(--green); box-shadow: 0 0 24px rgba(0,255,136,.18); }
+      .sec-btn .ic { font-size: 0.95rem; color: var(--muted); transition: all 200ms; }
+      .sec-btn:hover .ic { color: var(--green); }
+      .sec-btn .badge {
+        margin-left: 0.4rem;
+        font-size: 0.6rem;
+        color: var(--green-dim);
+        background: rgba(0,255,136,.08);
+        padding: 0.1rem 0.45rem;
+        border: 1px solid rgba(0,255,136,.25);
+        letter-spacing: 0.12em;
+      }
+      .sec-btn.with-warn .ic { color: var(--amber); }
+      .sec-btn.with-warn:hover { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 24px rgba(255,176,32,.2); }
+      .sec-btn.with-warn:hover .ic { color: var(--amber); }
+
+      /* === REMINDER STATUS CHIP (topbar) === */
+      .rem-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.45rem 0.75rem;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        font-size: 0.65rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .rem-chip.on { color: var(--green); border-color: rgba(0,255,136,.35); }
+      .rem-chip.on .rem-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+      .rem-chip .rem-dot {
+        width: 5px; height: 5px;
+        border-radius: 999px;
+        background: var(--muted);
+      }
+
+      /* === MODAL === */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.78);
+        backdrop-filter: blur(4px);
+        z-index: 180;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        animation: modalFadeIn 200ms ease;
+      }
+      .modal-overlay.hidden { display: none; }
+      @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .modal {
+        position: relative;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        max-width: 560px;
+        width: 100%;
+        padding: 2rem 2.25rem;
+        animation: modalSlide 280ms cubic-bezier(.2,.8,.2,1);
+      }
+      @keyframes modalSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      .modal::before, .modal::after,
+      .modal > .corner-tr, .modal > .corner-bl {
+        content: "";
+        position: absolute;
+        width: 14px;
+        height: 14px;
+      }
+      .modal::before { top: -1px; left: -1px; border-top: 2px solid var(--green); border-left: 2px solid var(--green); }
+      .modal::after { bottom: -1px; right: -1px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
+      .modal > .corner-tr { top: -1px; right: -1px; border-top: 2px solid var(--green); border-right: 2px solid var(--green); }
+      .modal > .corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid var(--green); border-left: 2px solid var(--green); }
+
+      .modal.danger::before, .modal.danger::after,
+      .modal.danger > .corner-tr, .modal.danger > .corner-bl {
+        border-color: var(--red) !important;
+      }
+
+      .modal-header {
+        margin-bottom: 1.5rem;
+      }
+      .modal-tag {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+      }
+      .modal-title {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        font-size: 1.45rem;
+        line-height: 1.1;
+        margin: 0 0 0.5rem;
+      }
+      .modal-title .pf { color: var(--green); }
+      .modal.danger .modal-title .pf { color: var(--red); }
+      .modal-sub {
+        color: var(--muted);
+        font-size: 0.85rem;
+        line-height: 1.55;
+      }
+      .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .modal-field {
+        background: #050505;
+        border: 1px solid var(--border);
+        padding: 0.85rem 1rem;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--text);
+        width: 100%;
+        font-size: 0.95rem;
+        outline: none;
+        transition: all 180ms;
+      }
+      .modal-field:focus { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+      .modal-label {
+        font-size: 0.65rem;
+        letter-spacing: 0.25em;
+        color: var(--muted);
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 0.35rem;
+      }
+      .modal-row {
+        display: flex;
+        gap: 0.85rem;
+      }
+      .modal-row > * { flex: 1; }
+      .modal-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.85rem;
+        margin-top: 1.75rem;
+      }
+      .modal-btn {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        padding: 0.85rem 1.6rem;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 200ms;
+      }
+      .modal-btn:hover { border-color: var(--green); color: var(--green); }
+      .modal-btn.primary { border-color: var(--green); color: var(--green); }
+      .modal-btn.primary:hover {
+        background: var(--green); color: #000;
+        box-shadow: 0 0 36px rgba(0,255,136,.4);
+      }
+      .modal-btn.danger { border-color: var(--red); color: var(--red); }
+      .modal-btn.danger:hover {
+        background: var(--red); color: #fff;
+        box-shadow: 0 0 36px rgba(255,51,85,.4);
+      }
+      .modal-meta {
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      .modal-meta .strong { color: var(--text); font-weight: 600; }
+      .modal-meta .amber { color: var(--amber); }
+      .modal-meta .green { color: var(--green); }
+      .modal-warning {
+        background: rgba(255,176,32,.06);
+        border: 1px solid rgba(255,176,32,.3);
+        border-left: 2px solid var(--amber);
+        padding: 0.75rem 0.9rem;
+        font-size: 0.78rem;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+      .modal-warning strong { color: var(--amber); }
+
+      .modal-channels { display: grid; grid-template-columns: 1fr; gap: 0.6rem; }
+      .modal-channel {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.75rem 0.9rem;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+      }
+      .modal-channel.on { border-color: rgba(0,255,136,.35); background: #0a100c; }
+      .modal-channel .ic { color: var(--muted); width: 18px; text-align: center; }
+      .modal-channel.on .ic { color: var(--green); }
+      .modal-channel .label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-weight: 700;
+        width: 80px;
+      }
+      .modal-channel .value {
+        color: var(--text);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        flex: 1;
+      }
+      .modal-channel .pip-mini {
+        width: 24px; height: 12px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        position: relative;
+        margin-left: auto;
+        transition: all 200ms;
+      }
+      .modal-channel .pip-mini::after {
+        content: "";
+        position: absolute;
+        left: 1px;
+        top: 1px;
+        width: 8px;
+        height: 8px;
+        background: var(--muted);
+        transition: all 200ms;
+      }
+      .modal-channel.on .pip-mini { background: rgba(0,255,136,.2); border-color: var(--green); }
+      .modal-channel.on .pip-mini::after { left: 13px; background: var(--green); box-shadow: 0 0 6px var(--green); }
     </style>
   </head>
   <body class="grid-bg state-active">
@@ -425,7 +682,7 @@
 
     <!-- TOPBAR -->
     <header class="px-10 py-6 flex justify-between items-center">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 flex-wrap">
         <a href="screen-2-identify.html" class="back-link">
           <span>◀</span><span>EXIT</span>
         </a>
@@ -436,6 +693,10 @@
           <span class="text-xs">7xK4...3pQ2</span>
           <span class="text-xs text-[var(--muted)]">·</span>
           <span class="text-xs text-[var(--green)] glow-green">12.40 SOL</span>
+        </div>
+        <div class="rem-chip" id="rem-chip">
+          <span class="rem-dot"></span>
+          <span id="rem-chip-text">REMINDERS · OFF</span>
         </div>
       </div>
 
@@ -526,15 +787,192 @@
         <span class="text-[var(--green-dim)] text-xs">tx 4Hk9...8nQ</span>
       </div>
 
+      <!-- SECONDARY ACTION ROW: deposit, update_config, reminders -->
+      <div class="secondary-row">
+        <button class="sec-btn" onclick="openModal('m-deposit')">
+          <span class="ic">＋</span><span>DEPOSIT</span>
+        </button>
+        <button class="sec-btn" onclick="openModal('m-config')">
+          <span class="ic">⚙</span><span>EDIT CONFIG</span>
+        </button>
+        <button class="sec-btn" onclick="openModal('m-reminders')">
+          <span class="ic">◔</span><span>REMINDERS</span>
+        </button>
+      </div>
+
       <!-- FOOTER -->
       <div class="footer">
-        <a class="footer-link danger" onclick="openCancel()">◀ CANCEL VAULT · returns 5.00 SOL to your wallet</a>
+        <a class="footer-link danger" onclick="openModal('m-cancel')">◀ CANCEL VAULT · returns 5.00 SOL to your wallet</a>
         <div class="flex gap-2">
           <a class="footer-link" onclick="alert('opens Solana Explorer (mockup)')">VIEW ON SOLANA EXPLORER ▸</a>
-          <a class="footer-link" onclick="openLog()">▤ TX LOG</a>
+          <a class="footer-link" onclick="openLog()">▤ EVENT LOG</a>
         </div>
       </div>
     </main>
+
+    <!-- ===== MODALS ===== -->
+
+    <!-- DEPOSIT (calls program: deposit) -->
+    <div class="modal-overlay hidden" id="m-deposit" onclick="if(event.target===this) closeModal('m-deposit')">
+      <div class="modal">
+        <span class="corner-tr"></span><span class="corner-bl"></span>
+        <div class="modal-header">
+          <div class="modal-tag"><span style="color:var(--green)">▸</span> ix · deposit()</div>
+          <h3 class="modal-title"><span class="pf">&gt;</span> ADD MORE SOL</h3>
+          <p class="modal-sub">
+            the vault PDA can hold any amount. top it up any time — your interval and last_checkin are unaffected.
+          </p>
+        </div>
+        <div class="modal-body">
+          <div class="modal-meta">
+            currently locked · <span class="green strong">5.00 SOL</span> &nbsp;·&nbsp;
+            wallet balance · <span class="strong">12.40 SOL</span>
+          </div>
+          <div>
+            <label class="modal-label">AMOUNT TO DEPOSIT (SOL)</label>
+            <input class="modal-field" id="dep-input" type="number" step="0.01" min="0.01" value="1.00" />
+          </div>
+          <div class="modal-row" style="gap: 0.5rem;">
+            <button class="modal-btn" style="flex:0 0 auto; padding:0.55rem 0.85rem" onclick="document.getElementById('dep-input').value=0.5">0.5</button>
+            <button class="modal-btn" style="flex:0 0 auto; padding:0.55rem 0.85rem" onclick="document.getElementById('dep-input').value=1.0">1.0</button>
+            <button class="modal-btn" style="flex:0 0 auto; padding:0.55rem 0.85rem" onclick="document.getElementById('dep-input').value=5.0">5.0</button>
+            <button class="modal-btn" style="flex:0 0 auto; padding:0.55rem 0.85rem; border-color:var(--amber); color:var(--amber)" onclick="document.getElementById('dep-input').value=12.39">MAX</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn" onclick="closeModal('m-deposit')">CANCEL</button>
+          <button class="modal-btn primary" onclick="confirmDeposit()">▸ DEPOSIT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDIT CONFIG (calls program: update_config) -->
+    <div class="modal-overlay hidden" id="m-config" onclick="if(event.target===this) closeModal('m-config')">
+      <div class="modal">
+        <span class="corner-tr"></span><span class="corner-bl"></span>
+        <div class="modal-header">
+          <div class="modal-tag"><span style="color:var(--green)">▸</span> ix · update_config()</div>
+          <h3 class="modal-title"><span class="pf">&gt;</span> EDIT VAULT CONFIG</h3>
+          <p class="modal-sub">
+            change the beneficiary, interval, or both. leave a field blank to keep the current value.
+            last_checkin and amount are untouched.
+          </p>
+        </div>
+        <div class="modal-body">
+          <div>
+            <label class="modal-label">NEW BENEFICIARY PUBKEY (CURRENT: 9mNx...wYz4)</label>
+            <input class="modal-field" id="cfg-ben" placeholder="leave blank to keep current" />
+          </div>
+          <div>
+            <label class="modal-label">NEW INTERVAL · DAYS (CURRENT: 30)</label>
+            <input class="modal-field" id="cfg-int" type="number" min="1" placeholder="leave blank to keep current" />
+          </div>
+          <div class="modal-warning">
+            <strong>⚠ careful:</strong> if you shorten the interval below
+            (now − last_checkin), the vault could become claimable immediately.
+            consider CHECK_IN first if you're unsure.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn" onclick="closeModal('m-config')">CANCEL</button>
+          <button class="modal-btn primary" onclick="confirmConfig()">▸ SAVE CONFIG</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REMINDERS (off-chain Supabase subscribe) -->
+    <div class="modal-overlay hidden" id="m-reminders" onclick="if(event.target===this) closeModal('m-reminders')">
+      <div class="modal" style="max-width: 620px">
+        <span class="corner-tr"></span><span class="corner-bl"></span>
+        <div class="modal-header">
+          <div class="modal-tag"><span style="color:var(--green)">▸</span> POST · /functions/v1/subscribe</div>
+          <h3 class="modal-title"><span class="pf">&gt;</span> REMINDER SETTINGS</h3>
+          <p class="modal-sub">
+            off-chain · advisory only · status:
+            <span id="rem-modal-status" class="amber">DISABLED</span>
+          </p>
+        </div>
+        <div class="modal-body">
+          <div class="modal-label">CHANNELS</div>
+          <div class="modal-channels">
+            <div class="modal-channel" id="rem-mc-email">
+              <span class="ic">✉</span>
+              <span class="label">EMAIL</span>
+              <span class="value" id="rem-mc-email-val">—</span>
+              <span class="pip-mini"></span>
+            </div>
+            <div class="modal-channel" id="rem-mc-tg">
+              <span class="ic">◉</span>
+              <span class="label">TELEGRAM</span>
+              <span class="value" id="rem-mc-tg-val">—</span>
+              <span class="pip-mini"></span>
+            </div>
+          </div>
+
+          <div class="modal-row" style="margin-top: 0.5rem">
+            <div>
+              <label class="modal-label">LEAD TIME</label>
+              <select class="modal-field" id="rem-lead">
+                <option value="3600">1 HOUR</option>
+                <option value="21600" selected>6 HOURS</option>
+                <option value="86400">24 HOURS</option>
+                <option value="259200">3 DAYS</option>
+              </select>
+            </div>
+            <div>
+              <label class="modal-label">REPEAT EVERY</label>
+              <select class="modal-field" id="rem-freq">
+                <option value="900" selected>15 MIN</option>
+                <option value="3600">1 HOUR</option>
+                <option value="21600">6 HOURS</option>
+                <option value="0">DO NOT REPEAT</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-warning" style="border-left-color: var(--green); background: rgba(0,255,136,.04); border-color: rgba(0,255,136,.18)">
+            <strong style="color:var(--green)">ⓘ not part of enforcement.</strong> contact info lives in Supabase
+            (RLS-locked). the on-chain <code style="color:var(--green)">claim</code> still requires the time gate
+            even if reminders fail.
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between">
+          <button class="modal-btn danger" id="rem-disable-btn" onclick="disableReminders()" style="display:none">DISABLE</button>
+          <span style="flex:1"></span>
+          <button class="modal-btn" onclick="closeModal('m-reminders')">CANCEL</button>
+          <button class="modal-btn primary" onclick="saveReminders()">▸ SAVE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANCEL VAULT (calls program: cancel) -->
+    <div class="modal-overlay hidden" id="m-cancel" onclick="if(event.target===this) closeModal('m-cancel')">
+      <div class="modal danger">
+        <span class="corner-tr"></span><span class="corner-bl"></span>
+        <div class="modal-header">
+          <div class="modal-tag" style="color: var(--red)"><span>!</span> ix · cancel()</div>
+          <h3 class="modal-title"><span class="pf">!</span> CANCEL VAULT</h3>
+          <p class="modal-sub">
+            this closes the switch PDA and returns
+            <span class="text-[var(--text)] font-semibold">5.00 SOL</span>
+            to your wallet. the beneficiary's claim window ends immediately.
+            you can re-arm later.
+          </p>
+        </div>
+        <div class="modal-body">
+          <div class="modal-warning" style="border-left-color: var(--red); background: rgba(255,51,85,.06); border-color: rgba(255,51,85,.3)">
+            <strong style="color:var(--red)">irreversible:</strong> the Switch account
+            is closed on-chain (rent reclaimed) and the
+            <code style="color:var(--red)">Cancelled</code> event is emitted.
+            re-arming creates a new PDA from scratch.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn" onclick="closeModal('m-cancel')">◀ KEEP VAULT</button>
+          <button class="modal-btn danger" onclick="confirmCancel()">▸ I'M SURE · CLOSE</button>
+        </div>
+      </div>
+    </div>
 
     <script>
       // Read params from screen-3
@@ -549,6 +987,36 @@
         const a = parseFloat(params.get("amt")).toFixed(2) + " SOL";
         document.getElementById("vault-amount").textContent = a;
       }
+
+      // Reminder subscription state (in-memory; in the real app this is server-side via Supabase)
+      const subscription = {
+        enabled: params.get("rem") === "1",
+        email: params.get("rem") === "1" && (params.get("ch") || "").includes("email") ? "owner@example.com" : "",
+        telegram: params.get("rem") === "1" && (params.get("ch") || "").includes("tg") ? "@yourbot · chat 123456789" : "",
+        leadSeconds: parseInt(params.get("lead") || "21600"),
+        frequencySeconds: parseInt(params.get("freq") || "900"),
+      };
+
+      function fmtSeconds(s) {
+        if (s === 0) return "off";
+        if (s >= 86400) return (s / 86400) + "D";
+        if (s >= 3600) return (s / 3600) + "H";
+        if (s >= 60) return (s / 60) + "M";
+        return s + "s";
+      }
+
+      function renderReminderChip() {
+        const chip = document.getElementById("rem-chip");
+        const txt = document.getElementById("rem-chip-text");
+        if (subscription.enabled) {
+          chip.classList.add("on");
+          txt.textContent = `REMINDERS · ON · ${fmtSeconds(subscription.leadSeconds)} LEAD`;
+        } else {
+          chip.classList.remove("on");
+          txt.textContent = "REMINDERS · OFF";
+        }
+      }
+      renderReminderChip();
 
       // Countdown state
       let remaining = 11 * 86400 + 23 * 3600 + 47 * 60 + 12;
@@ -648,21 +1116,159 @@
       render();
       startTicker();
 
-      // CHECK_IN handler (mockup: animate countdown reset to 30 days)
+      // CHECK_IN handler (ix: check_in → emits CheckedIn event)
       document.getElementById("check-in").addEventListener("click", () => {
-        // flash green flood
+        showTx("check_in", "last_checkin reset to Clock::now()", () => {
+          setState("active", (parseInt(params.get("int")) || 30) * 86400);
+          pushEvent({ kind: "CheckedIn", meta: "last_checkin reset", sig: "newTx", color: "var(--green)" });
+        });
+      });
+
+      // === MODAL HELPERS ===
+      function openModal(id) {
+        document.getElementById(id).classList.remove("hidden");
+        if (id === "m-reminders") renderRemindersModal();
+      }
+      function closeModal(id) {
+        document.getElementById(id).classList.add("hidden");
+      }
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          document.querySelectorAll(".modal-overlay").forEach((m) => m.classList.add("hidden"));
+        }
+      });
+
+      // === ACTIVITY LOG (events emitted by every ix) ===
+      const activity = [
+        params.get("rem") === "1"
+          ? { kind: "Subscribed (off-chain)", meta: `lead ${fmtSeconds(subscription.leadSeconds)} · repeat ${fmtSeconds(subscription.frequencySeconds)}`, sig: "supabase", when: "just now", color: "var(--amber)" }
+          : null,
+        { kind: "SwitchInitialized", meta: `${(parseFloat(params.get("amt")) || 5).toFixed(2)} SOL · ${params.get("int") || 30}d interval`, sig: "7mNq...rT5", when: "just now", color: "var(--green)" },
+        { kind: "CheckedIn", meta: "", sig: "4Hk9...8nQ", when: "May 11, 14:23", color: "var(--green)" },
+        { kind: "CheckedIn", meta: "", sig: "9aB2...Lm3", when: "Apr 11, 09:01", color: "var(--green)" },
+      ].filter(Boolean);
+
+      function pushEvent(ev) { activity.unshift({ ...ev, when: "just now" }); }
+
+      function openLog() {
+        const lines = activity.map((e) =>
+          `${e.kind.padEnd(22)} ${e.meta ? "· " + e.meta + " " : ""}· ${e.sig}  (${e.when})`
+        ).join("\n");
+        alert("[MOCKUP] ON-CHAIN EVENT LOG\n\n" + lines + "\n\nin the real app, this opens a side drawer subscribed to the program's event stream.");
+      }
+
+      // === DEPOSIT (ix: deposit) ===
+      function confirmDeposit() {
+        const v = parseFloat(document.getElementById("dep-input").value);
+        if (!v || v <= 0) return;
+        closeModal("m-deposit");
+        showTx("deposit", `+${v.toFixed(2)} SOL`, () => {
+          // update displayed amount
+          const cur = parseFloat(document.getElementById("vault-amount").textContent) || 5;
+          const total = (cur + v).toFixed(2) + " SOL";
+          document.getElementById("vault-amount").textContent = total;
+          pushEvent({ kind: "Deposited", meta: `+${v.toFixed(2)} SOL · total ${total}`, sig: "newTx", color: "var(--green)" });
+        });
+      }
+
+      // === EDIT CONFIG (ix: update_config) ===
+      function confirmConfig() {
+        const newBen = document.getElementById("cfg-ben").value.trim();
+        const newInt = parseInt(document.getElementById("cfg-int").value) || 0;
+        if (!newBen && !newInt) {
+          alert("nothing to change — enter a new beneficiary, interval, or both.");
+          return;
+        }
+        closeModal("m-config");
+        const parts = [];
+        if (newBen) parts.push(`ben → ${newBen.slice(0, 4)}...${newBen.slice(-4)}`);
+        if (newInt) parts.push(`interval → ${newInt}d`);
+        showTx("update_config", parts.join(" · "), () => {
+          if (newBen) document.getElementById("vault-ben").textContent = newBen.slice(0, 4) + "..." + newBen.slice(-4);
+          if (newInt) document.getElementById("vault-int").textContent = newInt + " DAYS";
+          pushEvent({ kind: "ConfigUpdated", meta: parts.join(" · "), sig: "newTx", color: "var(--green)" });
+        });
+      }
+
+      // === CANCEL (ix: cancel) ===
+      function confirmCancel() {
+        closeModal("m-cancel");
+        showTx("cancel", "5.00 SOL returned · vault closed", () => {
+          // in real app: navigate back; here: just show an alert
+          setTimeout(() => alert("[MOCKUP] vault closed — Cancelled event emitted. you'd navigate back to /identify."), 200);
+        });
+      }
+
+      // === REMINDERS (POST /functions/v1/subscribe — off-chain) ===
+      function renderRemindersModal() {
+        const mcEmail = document.getElementById("rem-mc-email");
+        const mcTg = document.getElementById("rem-mc-tg");
+        const emailVal = document.getElementById("rem-mc-email-val");
+        const tgVal = document.getElementById("rem-mc-tg-val");
+        const status = document.getElementById("rem-modal-status");
+        const disableBtn = document.getElementById("rem-disable-btn");
+
+        if (subscription.email) {
+          mcEmail.classList.add("on");
+          emailVal.textContent = subscription.email;
+        } else {
+          mcEmail.classList.remove("on");
+          emailVal.textContent = "not set";
+        }
+        if (subscription.telegram) {
+          mcTg.classList.add("on");
+          tgVal.textContent = subscription.telegram;
+        } else {
+          mcTg.classList.remove("on");
+          tgVal.textContent = "not set";
+        }
+        document.getElementById("rem-lead").value = subscription.leadSeconds;
+        document.getElementById("rem-freq").value = subscription.frequencySeconds;
+        if (subscription.enabled) {
+          status.textContent = "ENABLED";
+          status.className = "green";
+          disableBtn.style.display = "inline-block";
+        } else {
+          status.textContent = "DISABLED";
+          status.className = "amber";
+          disableBtn.style.display = "none";
+        }
+      }
+
+      function saveReminders() {
+        subscription.enabled = true;
+        subscription.leadSeconds = parseInt(document.getElementById("rem-lead").value);
+        subscription.frequencySeconds = parseInt(document.getElementById("rem-freq").value);
+        // in real app: POST {switch_pda, owner_pubkey, email, telegram_chat_id, lead_seconds, frequency_seconds, enabled} to /functions/v1/subscribe
+        closeModal("m-reminders");
+        renderReminderChip();
+        showTx("subscribe (off-chain)", `lead ${fmtSeconds(subscription.leadSeconds)} · repeat ${fmtSeconds(subscription.frequencySeconds)}`, () => {
+          pushEvent({ kind: "Subscribed (off-chain)", meta: `lead ${fmtSeconds(subscription.leadSeconds)} · repeat ${fmtSeconds(subscription.frequencySeconds)}`, sig: "supabase", color: "var(--amber)" });
+        }, "var(--amber)");
+      }
+
+      function disableReminders() {
+        subscription.enabled = false;
+        // in real app: POST {switch_pda, owner_pubkey, enabled: false} — mutes by upserting enabled=false
+        closeModal("m-reminders");
+        renderReminderChip();
+      }
+
+      // === SHARED TX FLOW OVERLAY ===
+      function showTx(fnName, sub, onDone, color) {
+        const c = color || "var(--green)";
+        const isOffChain = fnName.includes("off-chain") || fnName.includes("subscribe");
+        const tag = isOffChain ? "POST · /functions/v1/subscribe" : "SIGNING TRANSACTION";
         const flood = document.createElement("div");
         flood.style.cssText = `
           position: fixed; inset: 0;
-          background: radial-gradient(ellipse at center, rgba(0,255,136,.4), rgba(0,255,136,0) 70%);
-          z-index: 150;
-          pointer-events: none;
+          background: radial-gradient(ellipse at center, ${c.includes("amber") ? "rgba(255,176,32,.4)" : "rgba(0,255,136,.4)"}, transparent 70%);
+          z-index: 150; pointer-events: none;
           animation: floodIn 700ms ease-out;
         `;
         document.body.appendChild(flood);
         setTimeout(() => flood.remove(), 700);
 
-        // tx confirmation overlay
         const overlay = document.createElement("div");
         overlay.style.cssText = `
           position: fixed; inset: 0;
@@ -670,42 +1276,26 @@
           display: flex; align-items: center; justify-content: center;
           z-index: 200; flex-direction: column; gap: 1.5rem;
           font-family: "JetBrains Mono", monospace;
-          color: var(--green);
         `;
         overlay.innerHTML = `
-          <div style="font-size:.65rem; letter-spacing:.32em; color:#888">SIGNING TRANSACTION</div>
-          <div style="font-size:2rem; font-weight:800; color:#00FF88; text-shadow: 0 0 24px rgba(0,255,136,.6);">
-            CHECK_IN()<span style="animation: blink 1s steps(2) infinite">_</span>
+          <div style="font-size:.65rem; letter-spacing:.32em; color:#888">${tag}</div>
+          <div style="font-size:1.6rem; font-weight:800; color:${c}; text-shadow: 0 0 20px ${c};">
+            ${fnName}()<span style="animation: blink 1s steps(2) infinite">_</span>
           </div>
-          <div style="margin-top:1rem;">
-            <div style="height:2px; width:200px; background:#1f1f1f; position:relative; overflow:hidden;">
-              <div style="height:100%; width:0%; background:#00FF88; box-shadow:0 0 12px #00FF88; animation: pgrs 1400ms ease forwards"></div>
-            </div>
-          </div>
-          <style>@keyframes pgrs { to { width: 100%; } }
-                 @keyframes floodIn { from { opacity: 1; } to { opacity: 0; } }</style>
+          <div style="font-size:.8rem; color:#888">${sub}</div>
+          <div><div style="height:2px; width:200px; background:#1f1f1f; position:relative; overflow:hidden;">
+            <div style="height:100%; width:0%; background:${c}; box-shadow:0 0 12px ${c}; animation: pgrs 1300ms ease forwards"></div>
+          </div></div>
+          <style>
+            @keyframes pgrs { to { width: 100%; } }
+            @keyframes floodIn { from { opacity: 1; } to { opacity: 0; } }
+          </style>
         `;
         document.body.appendChild(overlay);
         setTimeout(() => {
           overlay.remove();
-          // reset to active state with full interval
-          setState("active", 30 * 86400);
-        }, 1500);
-      });
-
-      function openCancel() {
-        const ok = confirm(
-          "[MOCKUP]\n\nCANCEL VAULT\n\nthis will close the switch PDA and return 5.00 SOL to your wallet. you can re-arm later. proceed?"
-        );
-        if (ok) alert("[MOCKUP]\n\ncancel() tx broadcast → vault closed → 5.00 SOL returned");
-      }
-      function openLog() {
-        alert(
-          "[MOCKUP]\n\nON-CHAIN ACTIVITY:\n\n" +
-          "▸ check_in · 4Hk9...8nQ · May 11 14:23\n" +
-          "▸ check_in · 9aB2...Lm3 · Apr 11 09:01\n" +
-          "▸ initialize · 7mNq...rT5 · Mar 12 10:44"
-        );
+          if (onDone) onDone();
+        }, 1400);
       }
 
       document.addEventListener("keydown", (e) => {
