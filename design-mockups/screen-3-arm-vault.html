@@ -611,6 +611,72 @@
       /* Touch target floor */
       .preset { min-height: 40px; }
       .btn, .btn-next, .btn-arm { min-height: 44px; }
+
+      /* === EXISTING-SWITCH PRE-CHECK BANNER === */
+      .exists-banner {
+        position: relative;
+        background: rgba(255, 176, 32, 0.06);
+        border: 1px solid rgba(255, 176, 32, 0.4);
+        padding: 1.5rem 1.75rem;
+        margin-bottom: 2rem;
+        animation: existsIn 320ms cubic-bezier(.2,.8,.2,1);
+      }
+      .exists-banner::before, .exists-banner::after {
+        content: "";
+        position: absolute;
+        width: 12px; height: 12px;
+        border-color: var(--amber);
+      }
+      .exists-banner::before { top: -1px; left: -1px; border-top: 2px solid var(--amber); border-left: 2px solid var(--amber); }
+      .exists-banner::after  { bottom: -1px; right: -1px; border-bottom: 2px solid var(--amber); border-right: 2px solid var(--amber); }
+      @keyframes existsIn {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .exists-tag {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--amber);
+        text-transform: uppercase;
+        font-weight: 700;
+        margin-bottom: 0.7rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .exists-title {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 800;
+        font-size: 1.25rem;
+        letter-spacing: -0.01em;
+        color: var(--text);
+        margin: 0 0 0.6rem;
+      }
+      .exists-sub {
+        color: var(--muted);
+        font-size: 0.85rem;
+        line-height: 1.6;
+        margin: 0 0 1.25rem;
+      }
+      .exists-sub code { color: var(--text); }
+      .exists-row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .exists-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.7rem;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        font-size: 0.75rem;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .exists-pill .lbl { color: var(--muted); font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; }
+      .exists-pill .val { color: var(--text); }
+      .exists-pill .green { color: var(--green); }
     </style>
   </head>
   <body class="grid-bg">
@@ -636,6 +702,27 @@
 
     <!-- MAIN -->
     <main class="max-w-3xl mx-auto px-6 py-8">
+      <!-- EXISTING-SWITCH PRE-CHECK BANNER (shown only if a switch already exists for this owner) -->
+      <div class="exists-banner" id="exists-banner" style="display:none" role="alert">
+        <div class="exists-tag">⚠ <span>EXISTING VAULT DETECTED · ON-CHAIN</span></div>
+        <h2 class="exists-title">your wallet already has a switch deployed.</h2>
+        <p class="exists-sub">
+          the program will reject a second <code>initialize()</code> — switch PDAs are seeded by
+          <code>(b"switch", owner.key())</code> and the account already exists. continue to manage
+          your existing vault, or top it up via <code>deposit()</code> from the cockpit.
+        </p>
+        <div class="exists-row mb-4">
+          <span class="exists-pill"><span class="lbl">VAULT</span><span class="val">8Hk9...vC3</span></span>
+          <span class="exists-pill"><span class="lbl">LOCKED</span><span class="val green">5.00 SOL</span></span>
+          <span class="exists-pill"><span class="lbl">INTERVAL</span><span class="val">30 DAYS</span></span>
+          <span class="exists-pill"><span class="lbl">LAST CHECK-IN</span><span class="val">18 DAYS AGO</span></span>
+        </div>
+        <div class="nav-row" style="margin-top: 0;">
+          <a href="screen-4-cockpit-owner.html" class="btn btn-next">CONTINUE ▸ TO COCKPIT</a>
+          <button class="btn" onclick="dismissExistsBanner()">DISMISS · let me see the wizard</button>
+        </div>
+      </div>
+
       <!-- progress bar + tick labels -->
       <div class="mb-3 flex items-center justify-between">
         <span class="stamp" id="step-label">STEP 01 OF 05 · BENEFICIARY</span>
@@ -895,6 +982,18 @@
     </main>
 
     <script>
+      // === PRE-CHECK: does a switch PDA already exist for this owner? ===
+      // In production this is: getAccountInfo(PDA(["switch", owner.key()]))
+      // → if non-null, show the banner. For the mockup we simulate via ?existing=1.
+      // (Real-flow stays the same; the banner is purely a graceful guard so the
+      //  user doesn't try to broadcast a doomed initialize() tx.)
+      if (new URLSearchParams(window.location.search).get("existing") === "1") {
+        document.getElementById("exists-banner").style.display = "block";
+      }
+      function dismissExistsBanner() {
+        document.getElementById("exists-banner").style.display = "none";
+      }
+
       const state = {
         step: 1,
         beneficiary: "",
