@@ -422,6 +422,150 @@
         text-decoration: underline;
         text-underline-offset: 2px;
       }
+
+      /* === STEP 5: REMINDERS (off-chain Supabase) === */
+      .vault-armed-banner {
+        background: rgba(0, 255, 136, 0.06);
+        border: 1px solid rgba(0, 255, 136, 0.35);
+        padding: 0.85rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+      .vault-armed-banner .check {
+        color: var(--green);
+        font-size: 1.1rem;
+        text-shadow: 0 0 10px rgba(0,255,136,.6);
+      }
+      .vault-armed-banner .meta {
+        color: var(--muted);
+        font-size: 0.75rem;
+        margin-left: auto;
+        letter-spacing: 0.15em;
+      }
+      .channel-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 1.1rem 1.2rem;
+        transition: all 220ms;
+      }
+      .channel-card.on {
+        border-color: rgba(0, 255, 136, 0.4);
+        background: #0a100c;
+      }
+      .channel-card.on .channel-icon { color: var(--green); text-shadow: 0 0 10px rgba(0,255,136,.5); }
+      .channel-card.off .channel-row { opacity: 0.45; }
+      .channel-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        transition: opacity 220ms;
+      }
+      .channel-icon {
+        font-size: 1.1rem;
+        color: var(--muted);
+        width: 22px;
+        text-align: center;
+      }
+      .channel-label {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .channel-toggle {
+        margin-left: auto;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.6rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+      }
+      .channel-toggle .pip {
+        width: 26px;
+        height: 14px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        position: relative;
+        transition: all 200ms;
+      }
+      .channel-toggle .pip::after {
+        content: "";
+        position: absolute;
+        left: 1px;
+        top: 1px;
+        width: 10px;
+        height: 10px;
+        background: var(--muted);
+        transition: all 200ms;
+      }
+      .channel-card.on .channel-toggle .pip {
+        background: rgba(0, 255, 136, 0.2);
+        border-color: var(--green);
+      }
+      .channel-card.on .channel-toggle .pip::after {
+        left: 13px;
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+      .channel-card.on .channel-toggle { color: var(--green); }
+      .channel-field {
+        background: #050505;
+        border: 1px solid var(--border);
+        padding: 0.7rem 0.9rem;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--text);
+        width: 100%;
+        font-size: 0.9rem;
+        outline: none;
+        transition: all 180ms;
+      }
+      .channel-field:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 1px var(--green);
+      }
+      .channel-meta {
+        font-size: 0.65rem;
+        letter-spacing: 0.18em;
+        color: var(--muted);
+        margin-top: 0.6rem;
+        text-transform: uppercase;
+      }
+
+      .cadence-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+      }
+      @media (max-width: 640px) {
+        .cadence-row { grid-template-columns: 1fr; }
+      }
+
+      .privacy-note {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-left: 2px solid var(--amber);
+        padding: 0.85rem 1rem;
+        font-size: 0.75rem;
+        line-height: 1.55;
+        color: var(--muted);
+        display: flex;
+        gap: 0.7rem;
+      }
+      .privacy-note .info-icon {
+        color: var(--amber);
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+      .privacy-note strong { color: var(--text); font-weight: 600; }
     </style>
   </head>
   <body class="grid-bg">
@@ -449,17 +593,18 @@
     <main class="max-w-3xl mx-auto px-6 py-8">
       <!-- progress bar + tick labels -->
       <div class="mb-3 flex items-center justify-between">
-        <span class="stamp" id="step-label">STEP 01 OF 04 · BENEFICIARY</span>
-        <span class="stamp" id="step-count">25%</span>
+        <span class="stamp" id="step-label">STEP 01 OF 05 · BENEFICIARY</span>
+        <span class="stamp" id="step-count">20%</span>
       </div>
       <div class="progress-wrap mb-2">
-        <div class="progress-fill" id="progress" style="width:25%"></div>
+        <div class="progress-fill" id="progress" style="width:20%"></div>
       </div>
       <div class="step-ticks mb-8">
         <span class="tick current" data-tick="1">01 BENEFICIARY</span>
         <span class="tick" data-tick="2">02 INTERVAL</span>
         <span class="tick" data-tick="3">03 AMOUNT</span>
         <span class="tick" data-tick="4">04 OATH</span>
+        <span class="tick" data-tick="5">05 REMINDERS</span>
       </div>
 
       <!-- summary chips -->
@@ -601,6 +746,107 @@
           </button>
         </div>
       </section>
+
+      <!-- STEP 5: REMINDERS (off-chain) -->
+      <section class="step" data-step="5">
+        <!-- on-chain success banner -->
+        <div class="vault-armed-banner">
+          <span class="check">✓</span>
+          <div>
+            <div class="stamp" style="color:var(--green); letter-spacing:.25em">VAULT ARMED · TX CONFIRMED</div>
+            <div class="text-xs text-[var(--muted)] mt-1">switch PDA <span class="text-[var(--text)]" id="armed-pda">8Hk9...vC3</span> · funds locked · countdown started</div>
+          </div>
+          <span class="meta" id="armed-tx">tx 7mNq...rT5</span>
+        </div>
+
+        <div>
+          <h2 class="prompt-line"><span class="pf">&gt;</span> DON'T MISS YOUR CHECK-IN.<span class="text-[var(--green)] blink">_</span></h2>
+          <p class="prompt-sub">
+            optional · off-chain · you can edit or disable any time.<br/>
+            we email or Telegram you before your interval elapses so the vault doesn't release on accident.
+          </p>
+        </div>
+
+        <!-- CHANNELS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="channel-card on" data-channel="email" id="card-email">
+            <div class="channel-row">
+              <span class="channel-icon">✉</span>
+              <span class="channel-label">EMAIL</span>
+              <label class="channel-toggle" onclick="toggleChannel('email')">
+                <span id="email-status">ON</span>
+                <span class="pip"></span>
+              </label>
+            </div>
+            <input
+              id="email-input"
+              class="channel-field"
+              type="email"
+              placeholder="owner@example.com"
+              value=""
+              autocomplete="email"
+            />
+            <div class="channel-meta">delivered via Resend</div>
+          </div>
+
+          <div class="channel-card off" data-channel="telegram" id="card-telegram">
+            <div class="channel-row">
+              <span class="channel-icon">◉</span>
+              <span class="channel-label">TELEGRAM</span>
+              <label class="channel-toggle" onclick="toggleChannel('telegram')">
+                <span id="tg-status">OFF</span>
+                <span class="pip"></span>
+              </label>
+            </div>
+            <input
+              id="tg-input"
+              class="channel-field"
+              placeholder="chat id (DM @deadman_switch_bot first)"
+              value=""
+            />
+            <div class="channel-meta">via Telegram Bot API</div>
+          </div>
+        </div>
+
+        <!-- CADENCE -->
+        <div class="cadence-row">
+          <div>
+            <label class="stamp">START WARNING ME</label>
+            <p class="text-xs text-[var(--muted)] mt-1">how far ahead of unlock to begin reminding</p>
+            <div class="presets mt-3" style="justify-content: flex-start;">
+              <button class="preset" data-lead="3600">1H</button>
+              <button class="preset selected" data-lead="21600">6H</button>
+              <button class="preset" data-lead="86400">24H</button>
+              <button class="preset" data-lead="259200">3D</button>
+            </div>
+          </div>
+          <div>
+            <label class="stamp">REPEAT EVERY</label>
+            <p class="text-xs text-[var(--muted)] mt-1">cadence inside the warning window</p>
+            <div class="presets mt-3" style="justify-content: flex-start;">
+              <button class="preset selected" data-freq="900">15M</button>
+              <button class="preset" data-freq="3600">1H</button>
+              <button class="preset" data-freq="21600">6H</button>
+              <button class="preset" data-freq="0">OFF</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PRIVACY NOTE -->
+        <div class="privacy-note">
+          <span class="info-icon">ⓘ</span>
+          <span>
+            contact info lives <strong>off-chain</strong> in Supabase (RLS-locked, service-role only).
+            <strong>not part of enforcement</strong> — if the notifier goes down, your funds are exactly as safe.
+            the on-chain <code style="color:var(--green)">claim</code> still requires the time gate.
+          </span>
+        </div>
+
+        <div class="nav-row" style="justify-content: space-between;">
+          <button onclick="skipReminders()" class="btn">SKIP ▸ TO COCKPIT</button>
+          <button id="btn-subscribe" class="btn btn-next">SUBSCRIBE ▸▸</button>
+        </div>
+      </section>
     </main>
 
     <script>
@@ -612,10 +858,11 @@
       };
 
       const labels = {
-        1: "STEP 01 OF 04 · BENEFICIARY",
-        2: "STEP 02 OF 04 · INTERVAL",
-        3: "STEP 03 OF 04 · AMOUNT",
-        4: "STEP 04 OF 04 · OATH",
+        1: "STEP 01 OF 05 · BENEFICIARY",
+        2: "STEP 02 OF 05 · INTERVAL",
+        3: "STEP 03 OF 05 · AMOUNT",
+        4: "STEP 04 OF 05 · OATH · ON-CHAIN",
+        5: "STEP 05 OF 05 · REMINDERS · OPTIONAL",
       };
 
       function shortAddr(s) {
@@ -679,9 +926,9 @@
         });
 
         // update progress + label
-        document.getElementById("progress").style.width = (n * 25) + "%";
+        document.getElementById("progress").style.width = (n * 20) + "%";
         document.getElementById("step-label").textContent = labels[n];
-        document.getElementById("step-count").textContent = (n * 25) + "%";
+        document.getElementById("step-count").textContent = (n * 20) + "%";
 
         state.step = n;
         updateSummary();
@@ -798,9 +1045,8 @@
         document.querySelectorAll('[data-amount]').forEach((b) => b.classList.remove("selected"));
       }
 
-      // Step 4: arm
+      // Step 4: arm — sign on-chain, then advance to Step 5 (reminders) instead of navigating
       document.getElementById("btn-arm").addEventListener("click", () => {
-        // mockup-only: show a "signing" overlay then transition to cockpit
         const overlay = document.createElement("div");
         overlay.style.cssText = `
           position: fixed; inset: 0;
@@ -814,10 +1060,11 @@
         overlay.innerHTML = `
           <div style="font-size:.65rem; letter-spacing:.32em; color:#888">SIGNING TRANSACTION</div>
           <div style="font-size:2rem; font-weight:800; color:#00FF88; text-shadow: 0 0 24px rgba(0,255,136,.6);">
-            ARM_VAULT()<span style="animation: blink 1s steps(2) infinite">_</span>
+            initialize()<span style="animation: blink 1s steps(2) infinite">_</span>
           </div>
-          <div style="font-size:.85rem; color:#666; max-width: 400px; text-align:center; line-height:1.6">
-            wallet popup → confirm → tx broadcasts to devnet → vault PDA created → switch state initialized
+          <div style="font-size:.85rem; color:#666; max-width: 460px; text-align:center; line-height:1.6">
+            wallet popup → confirm → tx broadcasts to devnet → vault PDA created
+            → <span style="color:#00FF88">SwitchInitialized</span> event emitted
           </div>
           <div style="margin-top:1rem">
             <div style="height:2px; width:200px; background:#1f1f1f; position:relative; overflow:hidden;">
@@ -831,14 +1078,95 @@
         `;
         document.body.appendChild(overlay);
         setTimeout(() => {
-          // pass state via query (just for show in cockpit)
-          const qs = new URLSearchParams({
-            ben: state.beneficiary,
-            int: state.intervalDays,
-            amt: state.amount,
-          });
-          window.location.href = "screen-4-cockpit-owner.html?" + qs.toString();
+          overlay.remove();
+          state.vaultArmed = true;
+          goToStep(5);
         }, 2000);
+      });
+
+      // Step 5: reminders (off-chain Supabase subscribe)
+      const reminderState = {
+        emailEnabled: true,
+        telegramEnabled: false,
+        leadSeconds: 21600,   // 6h default per user choice
+        frequencySeconds: 900, // 15m
+      };
+
+      function toggleChannel(name) {
+        const card = document.getElementById(name === "email" ? "card-email" : "card-telegram");
+        const stat = document.getElementById(name === "email" ? "email-status" : "tg-status");
+        const isOn = card.classList.contains("on");
+        card.classList.toggle("on", !isOn);
+        card.classList.toggle("off", isOn);
+        stat.textContent = !isOn ? "ON" : "OFF";
+        if (name === "email") reminderState.emailEnabled = !isOn;
+        else reminderState.telegramEnabled = !isOn;
+      }
+
+      document.querySelectorAll('[data-lead]').forEach((btn) => {
+        btn.addEventListener("click", () => {
+          reminderState.leadSeconds = parseInt(btn.dataset.lead);
+          document.querySelectorAll('[data-lead]').forEach((b) => {
+            b.classList.toggle("selected", b === btn);
+          });
+        });
+      });
+      document.querySelectorAll('[data-freq]').forEach((btn) => {
+        btn.addEventListener("click", () => {
+          reminderState.frequencySeconds = parseInt(btn.dataset.freq);
+          document.querySelectorAll('[data-freq]').forEach((b) => {
+            b.classList.toggle("selected", b === btn);
+          });
+        });
+      });
+
+      function navigateToCockpit(subscribed) {
+        const qs = new URLSearchParams({
+          ben: state.beneficiary,
+          int: state.intervalDays,
+          amt: state.amount,
+        });
+        if (subscribed) {
+          qs.set("rem", "1");
+          qs.set("lead", reminderState.leadSeconds);
+          qs.set("freq", reminderState.frequencySeconds);
+          qs.set("ch", [
+            reminderState.emailEnabled ? "email" : null,
+            reminderState.telegramEnabled ? "tg" : null,
+          ].filter(Boolean).join(","));
+        }
+        window.location.href = "screen-4-cockpit-owner.html?" + qs.toString();
+      }
+
+      function skipReminders() {
+        navigateToCockpit(false);
+      }
+
+      document.getElementById("btn-subscribe").addEventListener("click", () => {
+        // mockup-only: simulate POST /subscribe → upsert into reminder_subscriptions
+        const overlay = document.createElement("div");
+        overlay.style.cssText = `
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,.92);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 200; flex-direction: column; gap: 1.25rem;
+          font-family: "JetBrains Mono", monospace;
+          color: var(--green);
+          animation: fadeIn 200ms ease;
+        `;
+        overlay.innerHTML = `
+          <div style="font-size:.65rem; letter-spacing:.32em; color:#888">POST · /functions/v1/subscribe</div>
+          <div style="font-size:1.5rem; font-weight:800; color:#00FF88; text-shadow: 0 0 20px rgba(0,255,136,.6);">
+            subscribing()<span style="animation: blink 1s steps(2) infinite">_</span>
+          </div>
+          <div style="font-size:.75rem; color:#666; max-width: 440px; text-align:center; line-height:1.6">
+            verify <span style="color:#00FF88">switch.owner == owner_pubkey</span> on-chain →
+            upsert into <span style="color:#00FF88">reminder_subscriptions</span> (RLS-locked, service-role only)
+          </div>
+          <style>@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }</style>
+        `;
+        document.body.appendChild(overlay);
+        setTimeout(() => navigateToCockpit(true), 1400);
       });
 
       // ESC = previous step
