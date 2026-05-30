@@ -23,7 +23,8 @@
         --violet: #a78bfa;
         --red: #ff3355;
         --text: #e8e8e8;
-        --muted: #6a6a6a;
+        --muted: #9a9a9a;      /* WCAG AA: 5.5:1 on #000 */
+        --muted-deep: #6a6a6a;
       }
       * { box-sizing: border-box; }
       html, body {
@@ -305,6 +306,55 @@
         display: inline-block;
       }
       .tile:hover .role-marker::before { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+      /* === ACCESSIBILITY === */
+      :focus { outline: none; }
+      :focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
+      }
+      .tile:focus-visible {
+        border-color: var(--green);
+        outline: 2px solid var(--green);
+        outline-offset: 4px;
+        box-shadow: 0 0 0 1px var(--green), 0 0 40px rgba(0, 255, 136, 0.18);
+      }
+      .back-link:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.18);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+        .blink, .fade-in, .slide-from-left, .slide-from-right {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+        }
+        /* Don't desaturate the non-hovered tile — keep both legible */
+        .tile-grid:has(.tile:hover) .tile:not(:hover) {
+          opacity: 1 !important;
+          filter: none !important;
+        }
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* Touch target floor */
+      .back-link { min-height: 36px; display: inline-flex; align-items: center; }
     </style>
   </head>
   <body class="grid-bg">
