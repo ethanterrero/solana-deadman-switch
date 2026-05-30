@@ -350,7 +350,7 @@
       <!-- the two tiles -->
       <div class="tile-grid mb-12">
         <!-- OWNER TILE -->
-        <a href="#" onclick="select('owner');return false;" class="tile slide-from-left" style="animation-delay:300ms">
+        <a href="screen-3-arm-vault.html" class="tile slide-from-left" style="animation-delay:300ms">
           <span class="corner-tr"></span>
           <span class="corner-bl"></span>
 
@@ -468,7 +468,7 @@
       }
 
       document.addEventListener("keydown", (e) => {
-        if (e.key === "1") select("owner");
+        if (e.key === "1") window.location.href = "screen-3-arm-vault.html";
         else if (e.key === "2") select("beneficiary");
         else if (e.key === "Escape") window.location.href = "screen-1-cold-open.html";
       });

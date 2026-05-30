@@ -179,37 +179,43 @@
           </div>
         </a>
 
-        <!-- Screen 3 — placeholder -->
-        <div class="card p-6 rounded-2xl opacity-40 cursor-not-allowed">
+        <!-- Screen 3 -->
+        <a href="screen-3-arm-vault.html" class="card p-6 rounded-2xl">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <span class="step-num todo">03</span>
+              <span class="step-num">03</span>
               <span class="text-xs uppercase tracking-widest text-neutral-500 mono">Arm the vault</span>
             </div>
-            <span class="text-neutral-600">·</span>
+            <span class="text-emerald-400 arrow">▶▶</span>
           </div>
-          <h3 class="text-lg font-bold mb-2">Owner wizard (4 steps)</h3>
-          <p class="text-sm text-neutral-400">
-            Beneficiary → interval → amount → the oath (signing screen).
+          <h3 class="text-lg font-bold mb-2">Owner wizard — 4 sub-steps</h3>
+          <p class="text-sm text-neutral-400 mb-2">
+            Beneficiary → interval → amount → the oath. Internal state machine,
+            progress bar, summary chips accumulate, ENTER to advance.
           </p>
-          <div class="text-xs text-neutral-600 mt-3 mono">not built yet</div>
-        </div>
+          <div class="text-xs text-neutral-500 mt-3 mono">
+            [ enter ] next · [ esc ] back · presets for interval/amount
+          </div>
+        </a>
 
-        <!-- Screen 4 — placeholder -->
-        <div class="card p-6 rounded-2xl opacity-40 cursor-not-allowed">
+        <!-- Screen 4 -->
+        <a href="screen-4-cockpit-owner.html" class="card p-6 rounded-2xl">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <span class="step-num todo">04</span>
+              <span class="step-num">04</span>
               <span class="text-xs uppercase tracking-widest text-neutral-500 mono">Live cockpit</span>
             </div>
-            <span class="text-neutral-600">·</span>
+            <span class="text-emerald-400 arrow">▶▶</span>
           </div>
-          <h3 class="text-lg font-bold mb-2">Owner — active vault</h3>
-          <p class="text-sm text-neutral-400">
-            Full-bleed countdown, CHECK_IN hero CTA, cancel escape hatch.
+          <h3 class="text-lg font-bold mb-2">Owner — active vault (demo centerpiece)</h3>
+          <p class="text-sm text-neutral-400 mb-2">
+            Massive countdown ticks every second. Hero CHECK_IN button.
+            Auto-escalates: amber → orange → red as time runs out.
           </p>
-          <div class="text-xs text-neutral-600 mt-3 mono">not built yet</div>
-        </div>
+          <div class="text-xs text-neutral-500 mt-3 mono">
+            [ space ] check_in · [ 1-4 ] preview states (active/warn/crit/expired)
+          </div>
+        </a>
 
         <!-- Screen 5 — placeholder -->
         <div class="card p-6 rounded-2xl opacity-40 cursor-not-allowed md:col-span-2">
