@@ -9,14 +9,14 @@
 
 ## Status
 
-- [x] Phase 0 — Setup (toolchain, wallets generated; devnet airdrop pending — faucet rate-limited)
-- [x] Phase 1 — Program (initialize, check_in, claim, cancel) — builds, IDL frozen
-- [x] Phase 2 — Anchor tests — `anchor test` green (5 passing)
+- [x] Phase 0 — Setup (toolchain, wallets funded)
+- [x] Phase 1 — Program (initialize, check_in, deposit, update_config, claim, cancel) — **deployed to devnet**, IDL frozen
+- [x] Phase 2 — Anchor tests — `anchor test` green (11 passing)
 - [ ] Phase 3 — Frontend
 - [ ] Phase 4 — Demo prep
 - [ ] Phase 5 — Submission
 
-**Devnet program ID:** `6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu` (pinned in `declare_id!` + `Anchor.toml`; `anchor deploy` pending owner-wallet funding)
+**Devnet program ID:** `6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu` — live on devnet (upgradeable; upgrade authority = owner wallet). On-chain IDL available via `anchor idl fetch`.
 
 ---
 
@@ -69,9 +69,13 @@ cd app && npm install && npm run dev
 
 ## How it works (judge talking point)
 
-1. `initialize` creates a Switch PDA seeded on the owner pubkey, stores `(owner, beneficiary, last_checkin, interval, amount)`, and deposits SOL into the PDA.
+1. `initialize` creates a Switch PDA seeded on the owner pubkey, stores `(owner, beneficiary, last_checkin, interval, amount)`, and deposits SOL into the PDA. Guards: `interval > 0`, `amount > 0`, `beneficiary != owner`.
 2. `check_in` (owner only) resets `last_checkin = Clock::now()`.
-3. `claim` (beneficiary only) requires `now >= last_checkin + interval`, otherwise reverts with `StillActive`.
-4. `cancel` (owner only) returns funds.
+3. `deposit` (owner only) tops up a live switch with more SOL.
+4. `update_config` (owner only) changes the beneficiary and/or interval.
+5. `claim` (beneficiary only) requires `now >= last_checkin + interval`, otherwise reverts with `StillActive`.
+6. `cancel` (owner only) returns funds.
+
+Every instruction emits an event (`SwitchInitialized`, `CheckedIn`, `Deposited`, `ConfigUpdated`, `Claimed`, `Cancelled`) so the frontend can render a live activity feed and react to a claim.
 
 The deadline is never *triggered* — it is *checked* by the claim transaction. No keeper, no cron. The vault is alive forever and only releases when both the time gate and the beneficiary signature align.
