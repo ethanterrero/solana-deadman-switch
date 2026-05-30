@@ -6,10 +6,10 @@ Tick tasks as you ship them. Owner column tells you which device picks it up.
 
 | # | Owner | Task | Blocking? |
 |---|---|---|---|
-| 1 | A | Install anchor (`avm`) + verify `anchor --version` | yes — blocks A's phase 0 |
-| 2 | A | `solana config set --url devnet` + generate owner keypair + airdrop 2 SOL | yes |
-| 3 | A | Generate beneficiary keypair to `~/.config/solana/beneficiary.json` | yes |
-| 4 | A | `anchor init` overlay into this repo and confirm stock deploy | yes — unblocks phase 1 |
+| ~~1~~ | A | ~~Install anchor (`avm`) + verify `anchor --version`~~ ✅ | done |
+| ~~2~~ | A | ~~`solana config set --url devnet` + generate owner keypair + airdrop 2 SOL~~ ✅ | done |
+| ~~3~~ | A | ~~Generate beneficiary keypair to `~/.config/solana/beneficiary.json`~~ ✅ | done |
+| ~~4~~ | A | ~~`anchor init` overlay into this repo and confirm stock deploy~~ ✅ | done |
 | 5 | B | `npm create vite@latest app -- --template react-ts` | no |
 | 6 | B | Install `@solana/web3.js`, `@coral-xyz/anchor`, `@solana/wallet-adapter-react`, `@solana/wallet-adapter-react-ui`, `@solana/wallet-adapter-wallets` | no |
 | 7 | B | Drop in wallet adapter provider + connect button | no |
@@ -18,14 +18,14 @@ Tick tasks as you ship them. Owner column tells you which device picks it up.
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 8 | A | Implement `Switch` state + `initialize` + `check_in` | 4 |
-| 9 | A | Implement `claim` + `cancel` + errors | 8 |
-| 10 | A | Update `declare_id!` and `Anchor.toml` with deployed program ID, redeploy | 9 |
-| 11 | A | Commit IDL + program ID — **handoff signal to B** | 10 |
+| ~~8~~ | A | ~~Implement `Switch` state + `initialize` + `check_in`~~ ✅ (+`deposit`, `update_config`, events) | done |
+| ~~9~~ | A | ~~Implement `claim` + `cancel` + errors~~ ✅ | done |
+| ~~10~~ | A | ~~Update `declare_id!` and `Anchor.toml` with deployed program ID, redeploy~~ ✅ | done |
+| ~~11~~ | A | ~~Commit IDL + program ID — **handoff signal to B**~~ ✅ handoff sent | done |
 | 12 | B | Hand-write `Switch` type stub matching PLAN.md state | 7 |
 | 13 | B | Build `InitForm` + `StatusPanel` + `ActionButtons` skeletons against the stub | 12 |
-| 14 | A | Write happy-path Anchor test | 10 |
-| 15 | A | Write 4 failure-mode tests | 14 |
+| ~~14~~ | A | ~~Write happy-path Anchor test~~ ✅ | done |
+| ~~15~~ | A | ~~Write 4 failure-mode tests~~ ✅ 11 passing + devnet smoke test | done |
 | 16 | B | Pull IDL, swap stub for real Anchor `Program` client | 11, 13 |
 | 17 | B | Wire all 4 buttons end-to-end against devnet | 16 |
 | 18 | B | Implement LOCKED/CLAIMABLE badge + countdown with color flip | 17 |

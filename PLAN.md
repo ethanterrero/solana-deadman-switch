@@ -3,44 +3,48 @@
 Source of truth for what to build, in order. Mirrors the original brief; mark phases complete here as you ship them.
 
 ## Phase 0 — Setup (~30 min) — **Device A**
-- [ ] `solana --version`, `anchor --version`, `rustc --version` all green
+- [x] `solana --version`, `anchor --version`, `rustc --version` all green
   - Anchor needs install: `cargo install --git https://github.com/coral-xyz/anchor avm --force && avm install latest && avm use latest`
-- [ ] `solana config set --url devnet`
-- [ ] Owner wallet: `solana-keygen new` + `solana airdrop 2`
-- [ ] Beneficiary wallet: `solana-keygen new -o ~/.config/solana/beneficiary.json`
-- [ ] `anchor init deadman-switch` inside this repo (or overlay into existing dir — see DEVICE_SPLIT.md)
-- [ ] Stock template builds + deploys: `anchor build && anchor deploy`
-- [ ] Commit clean scaffold
+- [x] `solana config set --url devnet`
+- [x] Owner wallet: `solana-keygen new` + `solana airdrop 2`
+- [x] Beneficiary wallet: `solana-keygen new -o ~/.config/solana/beneficiary.json`
+- [x] `anchor init deadman-switch` inside this repo (or overlay into existing dir — see DEVICE_SPLIT.md)
+- [x] Stock template builds + deploys: `anchor build && anchor deploy`
+- [x] Commit clean scaffold
 
 **Done when:** stock Anchor program deployed to devnet, two funded wallets exist.
 
 ---
 
 ## Phase 1 — Program (~2–3 hr) — **Device A**
-- [ ] `Switch` state: `owner, beneficiary, last_checkin, interval, amount, bump`
-- [ ] `initialize` — create Switch PDA seeded on owner, stamp `last_checkin = now`, deposit lamports
-- [ ] `check_in` — owner-only, set `last_checkin = now`
-- [ ] `claim` — beneficiary-only, require `now >= last_checkin + interval`, move lamports
-- [ ] `cancel` — owner-only, return funds
-- [ ] `SwitchError::{StillActive, Unauthorized}`
-- [ ] Update `declare_id!` + `Anchor.toml` with deployed program ID, redeploy
-- [ ] Commit IDL at `target/idl/deadman_switch.json` so Device B can consume
+- [x] `Switch` state: `owner, beneficiary, last_checkin, interval, amount, bump`
+- [x] `initialize` — create Switch PDA seeded on owner, stamp `last_checkin = now`, deposit lamports
+- [x] `check_in` — owner-only, set `last_checkin = now`
+- [x] `claim` — beneficiary-only, require `now >= last_checkin + interval`, move lamports
+- [x] `cancel` — owner-only, return funds
+- [x] `SwitchError::{StillActive, Unauthorized, InvalidInterval, InvalidAmount, InvalidBeneficiary}`
+- [x] `deposit` (top-up) + `update_config` (change beneficiary/interval) — added beyond original scope
+- [x] Every ix emits an event (`SwitchInitialized, CheckedIn, Deposited, ConfigUpdated, Claimed, Cancelled`)
+- [x] Update `declare_id!` + `Anchor.toml` with deployed program ID, redeploy
+- [x] Commit IDL at `target/idl/deadman_switch.json` so Device B can consume
 
-**Lamport movement:** keep funds in the Switch PDA itself; use `try_borrow_mut_lamports`. Avoids CPI signing for a separate vault.
+**Lamport movement:** keep funds in the Switch PDA itself; `claim`/`cancel` use the `close =` constraint to sweep the PDA's lamports (deposit + rent) to the recipient. Avoids CPI signing for a separate vault.
 
-**Done when:** all 4 ixs build + deploy; `initialize` callable from a test.
+**Done when:** all ixs build + deploy; `initialize` callable from a test. ✅ live on devnet.
 
 ---
 
 ## Phase 2 — Tests (~1–1.5 hr) — **Device A**
-- [ ] Happy path: init → check_in → claim fails (StillActive) → sleep → claim succeeds
-- [ ] `claim` reverts with `StillActive` before interval
-- [ ] `claim` reverts if caller != beneficiary
-- [ ] `check_in` reverts if caller != owner
-- [ ] `cancel` returns funds + blocks later claim
-- [ ] Use 5–10s test interval; `sleep` past the boundary
+- [x] Happy path: init → check_in → claim fails (StillActive) → sleep → claim succeeds
+- [x] `claim` reverts with `StillActive` before interval
+- [x] `claim` reverts if caller != beneficiary
+- [x] `check_in` reverts if caller != owner
+- [x] `cancel` returns funds + blocks later claim
+- [x] Init guards (interval/amount/beneficiary), deposit owner-only, update_config swap, CheckedIn event decode
+- [x] Use 5–10s test interval; `sleep` past the boundary
+- [x] `scripts/smoke-devnet.ts` — full lifecycle against the live devnet program
 
-**Done when:** `anchor test` green.
+**Done when:** `anchor test` green. ✅ 11 passing; devnet smoke test green.
 
 ---
 
