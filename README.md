@@ -79,3 +79,24 @@ cd app && npm install && npm run dev
 Every instruction emits an event (`SwitchInitialized`, `CheckedIn`, `Deposited`, `ConfigUpdated`, `Claimed`, `Cancelled`) so the frontend can render a live activity feed and react to a claim.
 
 The deadline is never *triggered* — it is *checked* by the claim transaction. No keeper, no cron. The vault is alive forever and only releases when both the time gate and the beneficiary signature align.
+
+---
+
+## Reminders (off-chain, advisory)
+
+The on-chain program is self-sufficient. On top of it, an **optional** notifier
+warns the owner before their switch unlocks so they can check in. It lives in
+`supabase/` (Postgres + two Edge Functions) and is the only off-chain piece:
+
+- `subscribe` — the frontend registers the owner's email / Telegram + cadence
+  (`lead_seconds`, `frequency_seconds`). It verifies the switch exists on-chain
+  and that `owner_pubkey` matches `switch.owner` before storing anything.
+- `reminder-tick` — runs every minute (pg_cron), reads each switch's
+  `last_checkin + interval` straight off devnet, and fires email (Resend) +
+  Telegram when inside the owner's chosen warning window.
+
+**This is purely advisory — it is not part of enforcement.** `claim` still
+requires the on-chain time gate, so even if the notifier is down, late, or wiped,
+funds are exactly as safe. Contact info is PII and lives off-chain only (never on
+the public ledger). See `supabase/SETUP.md` for secrets, the frontend contract,
+and operations.
