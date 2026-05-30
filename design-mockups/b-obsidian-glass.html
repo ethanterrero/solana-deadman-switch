@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Direction B — Obsidian Glass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Orbitron:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-0: #06081a;
+        --bg-1: #0a0e27;
+        --bg-2: #131838;
+        --gold: #f59e0b;
+        --gold-soft: #fbbf24;
+        --violet: #8b5cf6;
+        --violet-soft: #a78bfa;
+        --green: #10b981;
+        --green-soft: #34d399;
+        --red: #ef4444;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.08);
+      }
+      html,
+      body {
+        background: var(--bg-1);
+        color: var(--text);
+        font-family: "Exo 2", system-ui, sans-serif;
+        font-weight: 400;
+      }
+      body {
+        background:
+          radial-gradient(
+            ellipse 80% 60% at 20% 0%,
+            rgba(139, 92, 246, 0.22),
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 60% 50% at 100% 30%,
+            rgba(245, 158, 11, 0.14),
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 50% 40% at 50% 100%,
+            rgba(16, 185, 129, 0.08),
+            transparent 60%
+          ),
+          var(--bg-1);
+        min-height: 100vh;
+      }
+      .display {
+        font-family: "Orbitron", sans-serif;
+        letter-spacing: 0.02em;
+      }
+      .glass {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px) saturate(140%);
+        -webkit-backdrop-filter: blur(20px) saturate(140%);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+      }
+      .glass-strong {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(24px) saturate(160%);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+      }
+      .glow-gold {
+        box-shadow: 0 0 80px rgba(245, 158, 11, 0.18),
+          inset 0 1px 0 rgba(245, 158, 11, 0.2),
+          inset 0 0 0 1px rgba(245, 158, 11, 0.25);
+      }
+      .glow-green {
+        box-shadow: 0 0 100px rgba(16, 185, 129, 0.32),
+          inset 0 1px 0 rgba(52, 211, 153, 0.3),
+          inset 0 0 0 1px rgba(16, 185, 129, 0.45);
+        animation: pulse-green 2.4s ease-in-out infinite;
+      }
+      @keyframes pulse-green {
+        0%, 100% {
+          box-shadow: 0 0 100px rgba(16, 185, 129, 0.32),
+            inset 0 1px 0 rgba(52, 211, 153, 0.3),
+            inset 0 0 0 1px rgba(16, 185, 129, 0.45);
+        }
+        50% {
+          box-shadow: 0 0 140px rgba(16, 185, 129, 0.5),
+            inset 0 1px 0 rgba(52, 211, 153, 0.45),
+            inset 0 0 0 1px rgba(16, 185, 129, 0.65);
+        }
+      }
+      .text-gold {
+        color: var(--gold);
+      }
+      .text-violet {
+        color: var(--violet);
+      }
+      .text-green {
+        color: var(--green-soft);
+      }
+      .text-muted {
+        color: var(--muted);
+      }
+      .btn {
+        font-family: "Exo 2", sans-serif;
+        font-weight: 600;
+        padding: 0.85rem 1.5rem;
+        border-radius: 14px;
+        transition: all 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        cursor: pointer;
+        font-size: 0.9rem;
+        letter-spacing: 0.03em;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+      .btn:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.16);
+        transform: translateY(-1px);
+      }
+      .btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--violet), #6d28d9);
+        border-color: rgba(167, 139, 250, 0.5);
+        color: #fff;
+        box-shadow: 0 8px 32px rgba(139, 92, 246, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: linear-gradient(135deg, #a78bfa, var(--violet));
+        box-shadow: 0 10px 40px rgba(139, 92, 246, 0.5);
+        transform: translateY(-2px);
+      }
+      .btn-success {
+        background: linear-gradient(135deg, var(--green), #059669);
+        border-color: rgba(52, 211, 153, 0.5);
+        color: #fff;
+        box-shadow: 0 8px 32px rgba(16, 185, 129, 0.45),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+      .btn-success:hover:not(:disabled) {
+        box-shadow: 0 10px 40px rgba(16, 185, 129, 0.65);
+        transform: translateY(-2px);
+      }
+      .btn-ghost-danger:hover:not(:disabled) {
+        border-color: rgba(239, 68, 68, 0.4);
+        background: rgba(239, 68, 68, 0.08);
+        color: #fca5a5;
+      }
+      .field {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border);
+        padding: 0.85rem 1rem;
+        font-family: "Exo 2", sans-serif;
+        color: var(--text);
+        width: 100%;
+        font-size: 0.95rem;
+        border-radius: 12px;
+        transition: all 180ms;
+      }
+      .field:focus {
+        outline: none;
+        border-color: rgba(139, 92, 246, 0.6);
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+      }
+      .countdown-digit {
+        font-family: "Orbitron", sans-serif;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        background: linear-gradient(180deg, #fef3c7 0%, var(--gold) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        filter: drop-shadow(0 0 24px rgba(245, 158, 11, 0.4));
+      }
+      .countdown-digit.live {
+        background: linear-gradient(180deg, #d1fae5 0%, var(--green) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        filter: drop-shadow(0 0 32px rgba(16, 185, 129, 0.55));
+      }
+      .badge-locked {
+        background: linear-gradient(
+          135deg,
+          rgba(245, 158, 11, 0.18),
+          rgba(245, 158, 11, 0.08)
+        );
+        border: 1px solid rgba(245, 158, 11, 0.45);
+        color: var(--gold-soft);
+        backdrop-filter: blur(20px);
+      }
+      .badge-live {
+        background: linear-gradient(
+          135deg,
+          rgba(16, 185, 129, 0.25),
+          rgba(16, 185, 129, 0.1)
+        );
+        border: 1px solid rgba(16, 185, 129, 0.6);
+        color: #6ee7b7;
+        backdrop-filter: blur(20px);
+        animation: glow-pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes glow-pulse {
+        0%, 100% {
+          box-shadow: 0 0 24px rgba(16, 185, 129, 0.4);
+        }
+        50% {
+          box-shadow: 0 0 40px rgba(16, 185, 129, 0.7);
+        }
+      }
+      .mesh-line {
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.08),
+          transparent
+        );
+      }
+      .pill {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--green-soft);
+        box-shadow: 0 0 8px var(--green-soft);
+      }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <!-- topbar -->
+    <header class="px-6 pt-6">
+      <div
+        class="max-w-6xl mx-auto glass flex items-center justify-between px-5 py-3"
+      >
+        <div class="flex items-center gap-3">
+          <div
+            class="w-9 h-9 rounded-xl flex items-center justify-center"
+            style="
+              background: linear-gradient(135deg, #f59e0b, #8b5cf6);
+              box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+            "
+          >
+            <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 2 L4 7 v6 c0 5 3.5 8 8 9 c4.5 -1 8 -4 8 -9 V7 z" />
+              <path d="M9 12 l2 2 4 -4" />
+            </svg>
+          </div>
+          <div>
+            <div class="display text-base font-bold tracking-wide">
+              OBSIDIAN<span class="text-gold">·</span>VAULT
+            </div>
+            <div class="text-[10px] text-muted tracking-[0.2em] uppercase">
+              Trustless inheritance · Solana devnet
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="pill">
+            <span class="dot"></span>
+            <span class="text-muted">7xK4...3pQ2</span>
+            <span class="text-muted">·</span>
+            <span class="text-gold font-semibold">12.40 SOL</span>
+          </div>
+          <button class="btn !py-2 !px-4 !text-sm">Disconnect</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- state toggle (mockup only) -->
+    <div class="max-w-6xl mx-auto px-6 pt-6">
+      <div class="flex items-center gap-3 text-xs text-muted">
+        <span>[mockup preview]</span>
+        <button onclick="setState('locked')" class="btn !py-1.5 !px-3 !text-xs">
+          LOCKED
+        </button>
+        <button onclick="setState('claim')" class="btn !py-1.5 !px-3 !text-xs">
+          CLAIMABLE
+        </button>
+      </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto px-6 py-6 grid grid-cols-12 gap-6">
+      <!-- main switch card -->
+      <section class="col-span-12 lg:col-span-8 space-y-6">
+        <div
+          id="status-card"
+          class="glass-strong glow-gold p-10 relative overflow-hidden"
+        >
+          <!-- subtle mesh -->
+          <div class="absolute inset-x-0 top-0 h-px mesh-line"></div>
+          <div class="absolute inset-x-0 bottom-0 h-px mesh-line"></div>
+
+          <div class="flex items-start justify-between mb-10">
+            <div>
+              <div class="text-[11px] text-muted tracking-[0.25em] uppercase">
+                Vault status · 8Hk9...vC3
+              </div>
+              <div class="display text-xl font-semibold mt-2">
+                <span id="amount-label">5.00 SOL </span><span class="text-muted font-normal">held in escrow</span>
+              </div>
+            </div>
+            <div
+              id="badge"
+              class="badge-locked display text-xs font-bold tracking-[0.3em] px-4 py-2 rounded-full"
+            >
+              ◇ LOCKED
+            </div>
+          </div>
+
+          <div class="text-[11px] text-muted tracking-[0.25em] uppercase mb-3">
+            <span id="cd-label">Unlocks in</span>
+          </div>
+          <div id="countdown" class="flex items-end gap-2 mb-6">
+            <div class="text-center">
+              <div class="countdown-digit text-7xl leading-none">11</div>
+              <div class="text-[10px] text-muted mt-2 tracking-widest">DAYS</div>
+            </div>
+            <div class="countdown-digit text-5xl leading-none pb-2 opacity-50">:</div>
+            <div class="text-center">
+              <div class="countdown-digit text-7xl leading-none">23</div>
+              <div class="text-[10px] text-muted mt-2 tracking-widest">HRS</div>
+            </div>
+            <div class="countdown-digit text-5xl leading-none pb-2 opacity-50">:</div>
+            <div class="text-center">
+              <div class="countdown-digit text-7xl leading-none">47</div>
+              <div class="text-[10px] text-muted mt-2 tracking-widest">MIN</div>
+            </div>
+            <div class="countdown-digit text-5xl leading-none pb-2 opacity-50">:</div>
+            <div class="text-center">
+              <div class="countdown-digit text-7xl leading-none">12</div>
+              <div class="text-[10px] text-muted mt-2 tracking-widest">SEC</div>
+            </div>
+          </div>
+
+          <!-- progress -->
+          <div class="h-2 rounded-full bg-white/5 overflow-hidden mb-8">
+            <div
+              id="progress"
+              class="h-full transition-all duration-700"
+              style="
+                width: 63%;
+                background: linear-gradient(90deg, #f59e0b, #fbbf24);
+                box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+              "
+            ></div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div class="glass p-4">
+              <div class="text-[10px] text-muted tracking-[0.2em] uppercase">
+                Beneficiary
+              </div>
+              <div class="font-semibold mt-1.5">9mNx...wYz4</div>
+            </div>
+            <div class="glass p-4">
+              <div class="text-[10px] text-muted tracking-[0.2em] uppercase">
+                Last check-in
+              </div>
+              <div class="font-semibold mt-1.5">May 11, 14:23 UTC</div>
+            </div>
+            <div class="glass p-4">
+              <div class="text-[10px] text-muted tracking-[0.2em] uppercase">
+                <span id="unlock-label">Unlocks at</span>
+              </div>
+              <div id="unlocks" class="font-semibold mt-1.5 text-gold">
+                Jun 10, 14:23 UTC
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- actions -->
+        <div class="grid grid-cols-3 gap-3">
+          <button id="btn-checkin" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            Check in
+          </button>
+          <button id="btn-claim" disabled class="btn">
+            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 7L9 18l-5-5"/></svg>
+            Claim
+          </button>
+          <button class="btn btn-ghost-danger">
+            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            Cancel
+          </button>
+        </div>
+
+        <!-- activity -->
+        <div class="glass p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="display text-sm font-semibold tracking-wide">
+              On-chain activity
+            </div>
+            <div class="text-[10px] text-muted">slot 312,094,221</div>
+          </div>
+          <div class="space-y-3 text-sm">
+            <div class="flex items-center justify-between py-2 border-b border-white/5">
+              <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400"></div>
+                <span>Check-in</span>
+                <span class="text-muted text-xs">4Hk9...8nQ</span>
+              </div>
+              <span class="text-muted text-xs">May 11, 14:23</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-white/5">
+              <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-emerald-400/60"></div>
+                <span>Check-in</span>
+                <span class="text-muted text-xs">9aB2...Lm3</span>
+              </div>
+              <span class="text-muted text-xs">Apr 11, 09:01</span>
+            </div>
+            <div class="flex items-center justify-between py-2">
+              <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full" style="background:#a78bfa;box-shadow:0 0 8px #a78bfa"></div>
+                <span>Initialize</span>
+                <span class="text-muted text-xs">7mNq...rT5</span>
+              </div>
+              <span class="text-muted text-xs">Mar 12, 10:44</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- right column -->
+      <aside class="col-span-12 lg:col-span-4 space-y-6">
+        <div class="glass p-6">
+          <div class="text-[11px] text-muted tracking-[0.25em] uppercase mb-1">
+            Create vault
+          </div>
+          <div class="display text-lg font-semibold mb-5">
+            New <span class="text-gold">switch</span>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs text-muted">Beneficiary pubkey</label>
+              <input
+                class="field mt-1.5"
+                placeholder="enter Solana address"
+                value="9mNxXkZpRq...wYz4"
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-muted">Interval</label>
+                <div class="relative">
+                  <input class="field mt-1.5 pr-12" value="30" />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted">days</span>
+                </div>
+              </div>
+              <div>
+                <label class="text-xs text-muted">Amount</label>
+                <div class="relative">
+                  <input class="field mt-1.5 pr-12" value="5.00" />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gold font-semibold">SOL</span>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary w-full mt-2">
+              Deploy vault
+            </button>
+          </div>
+        </div>
+
+        <div class="glass p-6">
+          <div class="display text-sm font-semibold mb-3">How it works</div>
+          <div class="space-y-3 text-sm text-muted leading-relaxed">
+            <div class="flex gap-3">
+              <span class="display text-gold font-bold">01</span>
+              <span>You lock SOL into a PDA seeded on your wallet.</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="display text-gold font-bold">02</span>
+              <span>Check in any time before the interval expires.</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="display text-gold font-bold">03</span>
+              <span>If you go silent, your beneficiary claims it on-chain.</span>
+            </div>
+            <div class="pt-3 mt-3 border-t border-white/5 text-xs">
+              <span class="text-violet font-semibold">No keepers, no cron.</span> The claim transaction itself enforces the deadline against Solana's <span class="text-gold">Clock</span>.
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-6 pb-8 pt-4 flex justify-between text-xs text-muted">
+      <span>Program: 6gbTnghr...z5fFu</span>
+      <span>RPC: api.devnet.solana.com</span>
+    </footer>
+
+    <script>
+      function setState(s) {
+        const card = document.getElementById("status-card");
+        const badge = document.getElementById("badge");
+        const cd = document.getElementById("countdown");
+        const checkin = document.getElementById("btn-checkin");
+        const claim = document.getElementById("btn-claim");
+        const unlocks = document.getElementById("unlocks");
+        const cdLabel = document.getElementById("cd-label");
+        const unlockLabel = document.getElementById("unlock-label");
+        const progress = document.getElementById("progress");
+        if (s === "locked") {
+          card.className = "glass-strong glow-gold p-10 relative overflow-hidden";
+          badge.className = "badge-locked display text-xs font-bold tracking-[0.3em] px-4 py-2 rounded-full";
+          badge.textContent = "◇ LOCKED";
+          cd.querySelectorAll(".countdown-digit").forEach((el) => {
+            el.classList.remove("live");
+          });
+          cd.querySelectorAll(".text-7xl").forEach((el, i) => {
+            el.textContent = ["11", "23", "47", "12"][i];
+          });
+          claim.disabled = true;
+          claim.classList.remove("btn-success");
+          checkin.disabled = false;
+          unlocks.className = "font-semibold mt-1.5 text-gold";
+          cdLabel.textContent = "Unlocks in";
+          unlockLabel.textContent = "Unlocks at";
+          progress.style.width = "63%";
+          progress.style.background = "linear-gradient(90deg, #f59e0b, #fbbf24)";
+          progress.style.boxShadow = "0 0 20px rgba(245,158,11,.6)";
+        } else {
+          card.className = "glass-strong glow-green p-10 relative overflow-hidden";
+          badge.className = "badge-live display text-xs font-bold tracking-[0.3em] px-4 py-2 rounded-full";
+          badge.textContent = "● CLAIMABLE";
+          cd.querySelectorAll(".countdown-digit").forEach((el) => {
+            el.classList.add("live");
+          });
+          cd.querySelectorAll(".text-7xl").forEach((el) => {
+            el.textContent = "00";
+          });
+          claim.disabled = false;
+          claim.classList.add("btn-success");
+          checkin.disabled = true;
+          unlocks.className = "font-semibold mt-1.5 text-green";
+          unlocks.textContent = "now · ready";
+          cdLabel.textContent = "Vault open";
+          unlockLabel.textContent = "Status";
+          progress.style.width = "100%";
+          progress.style.background = "linear-gradient(90deg, #10b981, #34d399)";
+          progress.style.boxShadow = "0 0 30px rgba(16,185,129,.8)";
+        }
+      }
+    </script>
+  </body>
+</html>

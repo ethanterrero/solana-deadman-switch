@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Direction A — Terminal Vault</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #000000;
+        --panel: #0a0a0a;
+        --panel-2: #0f0f0f;
+        --border: #1f1f1f;
+        --green: #00ff88;
+        --green-dim: #00aa5a;
+        --amber: #ffb020;
+        --amber-dim: #b87a14;
+        --red: #ff3355;
+        --text: #e8e8e8;
+        --muted: #6a6a6a;
+      }
+      html,
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-feature-settings: "ss01", "cv01", "cv02";
+      }
+      /* CRT scanlines */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.025) 0px,
+          rgba(255, 255, 255, 0.025) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        pointer-events: none;
+        z-index: 100;
+        mix-blend-mode: overlay;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+      }
+      .panel-deep {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+      }
+      .glow-green {
+        text-shadow: 0 0 8px rgba(0, 255, 136, 0.6),
+          0 0 24px rgba(0, 255, 136, 0.25);
+      }
+      .glow-amber {
+        text-shadow: 0 0 8px rgba(255, 176, 32, 0.6),
+          0 0 24px rgba(255, 176, 32, 0.25);
+      }
+      .glow-red {
+        text-shadow: 0 0 8px rgba(255, 51, 85, 0.7),
+          0 0 24px rgba(255, 51, 85, 0.3);
+      }
+      .ring-green {
+        box-shadow: inset 0 0 0 1px rgba(0, 255, 136, 0.4),
+          0 0 40px rgba(0, 255, 136, 0.15);
+      }
+      .ring-amber {
+        box-shadow: inset 0 0 0 1px rgba(255, 176, 32, 0.4),
+          0 0 40px rgba(255, 176, 32, 0.12);
+      }
+      .btn {
+        font-family: inherit;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 0.85rem 1.25rem;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--text);
+        transition: all 150ms ease;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      .btn:hover:not(:disabled) {
+        border-color: var(--green);
+        color: var(--green);
+        box-shadow: 0 0 24px rgba(0, 255, 136, 0.2);
+      }
+      .btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--green);
+        color: #000;
+        border-color: var(--green);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #00ffa0;
+        color: #000;
+        box-shadow: 0 0 32px rgba(0, 255, 136, 0.45);
+      }
+      .btn-danger:hover:not(:disabled) {
+        border-color: var(--red);
+        color: var(--red);
+        box-shadow: 0 0 24px rgba(255, 51, 85, 0.2);
+      }
+      .blink {
+        animation: blink 1.2s steps(2, jump-none) infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .field {
+        background: #050505;
+        border: 1px solid var(--border);
+        padding: 0.75rem 0.9rem;
+        font-family: inherit;
+        color: var(--text);
+        width: 100%;
+        font-size: 0.9rem;
+      }
+      .field:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 1px var(--green);
+      }
+      .ascii {
+        white-space: pre;
+        line-height: 1;
+      }
+      .marquee::before {
+        content: "▮ ";
+        color: var(--green);
+      }
+      .grid-bg {
+        background-image: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0.03) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.03) 1px,
+            transparent 1px
+          );
+        background-size: 32px 32px;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen grid-bg">
+    <!-- topbar -->
+    <header class="border-b border-[var(--border)]">
+      <div
+        class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <div
+            class="w-8 h-8 border border-[var(--green)] flex items-center justify-center glow-green"
+          >
+            <span class="text-[var(--green)] text-sm font-bold">◉</span>
+          </div>
+          <div>
+            <div class="text-[10px] text-[var(--muted)] tracking-[0.2em]">
+              SOLANA / DEVNET
+            </div>
+            <div class="text-sm font-bold tracking-wider">
+              DEADMAN_SWITCH<span class="text-[var(--green)] blink">_</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 panel px-3 py-2">
+          <div class="w-2 h-2 rounded-full bg-[var(--green)] glow-green"></div>
+          <span class="text-xs text-[var(--muted)]">CONNECTED</span>
+          <span class="text-xs text-[var(--text)]">7xK4...3pQ2</span>
+          <span class="text-xs text-[var(--muted)]">|</span>
+          <span class="text-xs text-[var(--green)] glow-green">12.4 SOL</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- state toggle (mockup only) -->
+    <div class="max-w-6xl mx-auto px-6 pt-6">
+      <div class="flex items-center gap-3 text-xs text-[var(--muted)]">
+        <span>[MOCKUP] preview state:</span>
+        <button
+          id="t-locked"
+          onclick="setState('locked')"
+          class="btn !py-1.5 !px-3 !text-[10px]"
+        >
+          LOCKED
+        </button>
+        <button
+          id="t-claim"
+          onclick="setState('claim')"
+          class="btn !py-1.5 !px-3 !text-[10px]"
+        >
+          CLAIMABLE
+        </button>
+      </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto px-6 py-6 grid grid-cols-12 gap-6">
+      <!-- left: switch status -->
+      <section class="col-span-12 lg:col-span-8">
+        <div id="status-card" class="panel ring-amber p-8 relative">
+          <!-- corner brackets -->
+          <span
+            class="absolute top-0 left-0 w-3 h-3 border-t border-l border-[var(--amber)]"
+          ></span>
+          <span
+            class="absolute top-0 right-0 w-3 h-3 border-t border-r border-[var(--amber)]"
+          ></span>
+          <span
+            class="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[var(--amber)]"
+          ></span>
+          <span
+            class="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[var(--amber)]"
+          ></span>
+
+          <div class="flex items-start justify-between mb-8">
+            <div>
+              <div class="text-[10px] text-[var(--muted)] tracking-[0.3em]">
+                SWITCH_PDA · 8Hk9...vC3
+              </div>
+              <div class="text-xs text-[var(--muted)] mt-1 marquee">
+                vault contains 5.000 SOL · interval 30d
+              </div>
+            </div>
+            <div
+              id="badge"
+              class="px-4 py-2 border border-[var(--amber)] text-[var(--amber)] text-xs font-bold tracking-[0.25em] glow-amber"
+            >
+              ◇ LOCKED
+            </div>
+          </div>
+
+          <div class="text-[10px] text-[var(--muted)] tracking-[0.3em] mb-2">
+            UNLOCKS_IN
+          </div>
+          <div id="countdown" class="flex items-end gap-3 mb-2">
+            <div>
+              <div
+                class="text-6xl font-bold text-[var(--amber)] glow-amber leading-none tabular-nums"
+              >
+                11
+              </div>
+              <div class="text-[10px] text-[var(--muted)] mt-2">DAYS</div>
+            </div>
+            <div class="text-3xl text-[var(--muted)] leading-none pb-3">:</div>
+            <div>
+              <div
+                class="text-6xl font-bold text-[var(--amber)] glow-amber leading-none tabular-nums"
+              >
+                23
+              </div>
+              <div class="text-[10px] text-[var(--muted)] mt-2">HRS</div>
+            </div>
+            <div class="text-3xl text-[var(--muted)] leading-none pb-3">:</div>
+            <div>
+              <div
+                class="text-6xl font-bold text-[var(--amber)] glow-amber leading-none tabular-nums"
+              >
+                47
+              </div>
+              <div class="text-[10px] text-[var(--muted)] mt-2">MIN</div>
+            </div>
+            <div class="text-3xl text-[var(--muted)] leading-none pb-3">:</div>
+            <div>
+              <div
+                class="text-6xl font-bold text-[var(--amber)] glow-amber leading-none tabular-nums blink"
+              >
+                12
+              </div>
+              <div class="text-[10px] text-[var(--muted)] mt-2">SEC</div>
+            </div>
+          </div>
+
+          <div
+            class="mt-8 grid grid-cols-3 gap-6 text-xs border-t border-[var(--border)] pt-6"
+          >
+            <div>
+              <div class="text-[var(--muted)] mb-1 tracking-[0.2em]">
+                BENEFICIARY
+              </div>
+              <div class="font-mono">9mNx...wYz4</div>
+            </div>
+            <div>
+              <div class="text-[var(--muted)] mb-1 tracking-[0.2em]">
+                LAST_CHECKIN
+              </div>
+              <div class="font-mono">2026-05-11 14:23 UTC</div>
+            </div>
+            <div>
+              <div class="text-[var(--muted)] mb-1 tracking-[0.2em]">
+                UNLOCKS_AT
+              </div>
+              <div id="unlocks" class="font-mono text-[var(--amber)]">
+                2026-06-10 14:23 UTC
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- action buttons -->
+        <div class="grid grid-cols-3 gap-3 mt-6">
+          <button id="btn-checkin" class="btn btn-primary">
+            ▲ CHECK_IN
+          </button>
+          <button id="btn-claim" disabled class="btn">◆ CLAIM</button>
+          <button class="btn btn-danger">✕ CANCEL</button>
+        </div>
+
+        <!-- log -->
+        <div class="panel mt-6 p-4">
+          <div class="text-[10px] text-[var(--muted)] tracking-[0.3em] mb-3">
+            ON_CHAIN_LOG
+          </div>
+          <div class="space-y-1.5 text-xs leading-relaxed">
+            <div class="text-[var(--muted)]">
+              <span class="text-[var(--green)]">▸</span> 2026-05-11 14:23 ::
+              check_in tx 4Hk9...→ <span class="text-[var(--green)]">ok</span>
+            </div>
+            <div class="text-[var(--muted)]">
+              <span class="text-[var(--green)]">▸</span> 2026-04-11 09:01 ::
+              check_in tx 9aB2...→ <span class="text-[var(--green)]">ok</span>
+            </div>
+            <div class="text-[var(--muted)]">
+              <span class="text-[var(--green)]">▸</span> 2026-03-12 10:44 ::
+              initialize tx 7mNq...→
+              <span class="text-[var(--green)]">ok</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- right: initialize form -->
+      <aside class="col-span-12 lg:col-span-4 space-y-6">
+        <div class="panel-deep p-5">
+          <div class="text-[10px] text-[var(--muted)] tracking-[0.3em] mb-1">
+            NEW_SWITCH
+          </div>
+          <div class="text-sm font-bold mb-4">> initialize_vault()</div>
+          <div class="space-y-3">
+            <div>
+              <label
+                class="text-[10px] text-[var(--muted)] tracking-[0.2em]"
+                >BENEFICIARY_PUBKEY</label
+              >
+              <input
+                class="field mt-1"
+                placeholder="9mNxXkZ...wYz4"
+                value="9mNxXkZpRq...wYz4"
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  class="text-[10px] text-[var(--muted)] tracking-[0.2em]"
+                  >INTERVAL_SEC</label
+                >
+                <input class="field mt-1" value="2592000" />
+              </div>
+              <div>
+                <label
+                  class="text-[10px] text-[var(--muted)] tracking-[0.2em]"
+                  >AMOUNT_SOL</label
+                >
+                <input class="field mt-1" value="5.00" />
+              </div>
+            </div>
+            <button class="btn btn-primary w-full mt-2">> DEPLOY</button>
+          </div>
+        </div>
+
+        <div class="panel p-5">
+          <div class="text-[10px] text-[var(--muted)] tracking-[0.3em] mb-3">
+            PROTOCOL
+          </div>
+          <pre class="ascii text-[10px] text-[var(--muted)] leading-tight">
++--------+         +--------+
+| OWNER  |--check->|  PDA   |
++--------+   (in)  +--------+
+                       |
+                  now>=ckpt+i
+                       v
+                  +----------+
+                  | BENEFIC. |
+                  +----------+
+          </pre>
+          <div class="text-[10px] text-[var(--muted)] mt-3 leading-relaxed">
+            no keeper. no cron. the claim tx itself checks
+            <span class="text-[var(--green)]">now >= last_checkin + interval</span>
+            against on-chain Clock.
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-6 py-6 text-[10px] text-[var(--muted)] tracking-[0.2em] border-t border-[var(--border)] mt-6 flex justify-between">
+      <span>PROGRAM 6gbTnghr...z5fFu</span>
+      <span>RPC api.devnet.solana.com · slot 312,094,221</span>
+    </footer>
+
+    <script>
+      function setState(s) {
+        const card = document.getElementById("status-card");
+        const badge = document.getElementById("badge");
+        const cd = document.getElementById("countdown");
+        const checkin = document.getElementById("btn-checkin");
+        const claim = document.getElementById("btn-claim");
+        const unlocks = document.getElementById("unlocks");
+        if (s === "locked") {
+          card.className = "panel ring-amber p-8 relative";
+          // recreate corner brackets color
+          card
+            .querySelectorAll("span.absolute")
+            .forEach((el) =>
+              el.className.includes("border")
+                ? (el.style.borderColor = "#FFB020")
+                : null
+            );
+          badge.className =
+            "px-4 py-2 border border-[var(--amber)] text-[var(--amber)] text-xs font-bold tracking-[0.25em] glow-amber";
+          badge.textContent = "◇ LOCKED";
+          cd.querySelectorAll(".text-6xl").forEach((el) => {
+            el.classList.remove("text-[var(--green)]", "glow-green");
+            el.classList.add("text-[var(--amber)]", "glow-amber");
+          });
+          claim.disabled = true;
+          checkin.disabled = false;
+          unlocks.className = "font-mono text-[var(--amber)]";
+        } else {
+          card.className = "panel ring-green p-8 relative";
+          card
+            .querySelectorAll("span.absolute")
+            .forEach((el) =>
+              el.className.includes("border")
+                ? (el.style.borderColor = "#00FF88")
+                : null
+            );
+          badge.className =
+            "px-4 py-2 border border-[var(--green)] text-[var(--green)] text-xs font-bold tracking-[0.25em] glow-green blink";
+          badge.textContent = "● CLAIMABLE";
+          cd.querySelectorAll(".text-6xl").forEach((el) => {
+            el.textContent = "00";
+            el.classList.remove("text-[var(--amber)]", "glow-amber");
+            el.classList.add("text-[var(--green)]", "glow-green");
+          });
+          claim.disabled = false;
+          claim.classList.add("btn-primary");
+          checkin.disabled = true;
+          unlocks.className = "font-mono text-[var(--green)] glow-green";
+        }
+      }
+    </script>
+  </body>
+</html>

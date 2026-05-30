@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Direction C — Brutalist Dead-Drop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f3ea;
+        --ink: #050505;
+        --red: #ff2d2d;
+        --yellow: #ffe600;
+        --green: #00d96b;
+        --blue: #2d3cff;
+        --paper: #ffffff;
+        --line: #050505;
+      }
+      * {
+        border-radius: 0 !important;
+      }
+      html,
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Space Mono", ui-monospace, monospace;
+        font-weight: 400;
+        /* paper noise */
+        background-image:
+          radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+          radial-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px);
+        background-size: 8px 8px, 12px 12px;
+        background-position: 0 0, 4px 4px;
+      }
+      .display {
+        font-family: "Space Mono", monospace;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .block {
+        background: var(--paper);
+        border: 3px solid var(--ink);
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      .block-ink {
+        background: var(--ink);
+        color: var(--paper);
+        border: 3px solid var(--ink);
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      .block-warn {
+        background: var(--yellow);
+        color: var(--ink);
+        border: 3px solid var(--ink);
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      .block-danger {
+        background: var(--red);
+        color: var(--paper);
+        border: 3px solid var(--ink);
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      .block-live {
+        background: var(--green);
+        color: var(--ink);
+        border: 3px solid var(--ink);
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+      .stamp {
+        font-family: "Space Mono", monospace;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+      }
+      .btn {
+        font-family: "Space Mono", monospace;
+        font-weight: 700;
+        padding: 0.9rem 1.4rem;
+        border: 3px solid var(--ink);
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        transition: none;
+        box-shadow: 5px 5px 0 var(--ink);
+        position: relative;
+        top: 0;
+        left: 0;
+      }
+      .btn:hover:not(:disabled) {
+        background: var(--yellow);
+        top: 2px;
+        left: 2px;
+        box-shadow: 3px 3px 0 var(--ink);
+      }
+      .btn:active:not(:disabled) {
+        top: 5px;
+        left: 5px;
+        box-shadow: 0 0 0 var(--ink);
+      }
+      .btn:disabled {
+        background: #d4d2c8;
+        color: #888;
+        cursor: not-allowed;
+        box-shadow: 5px 5px 0 #888;
+      }
+      .btn-primary {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--blue);
+        color: var(--paper);
+      }
+      .btn-success {
+        background: var(--green);
+        color: var(--ink);
+      }
+      .btn-success:hover:not(:disabled) {
+        background: var(--green);
+        color: var(--ink);
+      }
+      .btn-danger {
+        background: var(--red);
+        color: var(--paper);
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: var(--red);
+        color: var(--paper);
+      }
+      .field {
+        background: var(--paper);
+        border: 3px solid var(--ink);
+        padding: 0.9rem 1rem;
+        font-family: "Space Mono", monospace;
+        font-weight: 700;
+        color: var(--ink);
+        width: 100%;
+        font-size: 0.95rem;
+      }
+      .field:focus {
+        outline: none;
+        background: var(--yellow);
+      }
+      .barcode {
+        font-family: "Libre Barcode 128", monospace;
+      }
+      .hatch {
+        background-image: repeating-linear-gradient(
+          45deg,
+          var(--ink) 0,
+          var(--ink) 2px,
+          transparent 2px,
+          transparent 8px
+        );
+      }
+      .perforation {
+        background-image: linear-gradient(
+          90deg,
+          var(--ink) 50%,
+          transparent 50%
+        );
+        background-size: 12px 3px;
+        background-repeat: repeat-x;
+        background-position: 0 center;
+        height: 3px;
+      }
+      .tag {
+        display: inline-block;
+        background: var(--ink);
+        color: var(--paper);
+        padding: 0.2rem 0.55rem;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .live-blink {
+        animation: live-blink 0.8s steps(2, jump-none) infinite;
+      }
+      @keyframes live-blink {
+        50% {
+          background: var(--ink);
+          color: var(--green);
+        }
+      }
+      .rotate-tag {
+        transform: rotate(-4deg);
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <!-- topbar -->
+    <header class="border-b-[3px] border-[var(--ink)]">
+      <div
+        class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-4">
+          <div
+            class="w-10 h-10 flex items-center justify-center bg-[var(--ink)] text-[var(--paper)]"
+          >
+            <span class="display text-xl">☠</span>
+          </div>
+          <div>
+            <div class="display text-lg">DEAD/MAN.SWITCH</div>
+            <div class="stamp text-[10px]">FORM A-04 · ON-CHAIN ENFORCEMENT · DEVNET</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="stamp px-3 py-2 border-[3px] border-[var(--ink)] bg-[var(--paper)]">
+            7xK4...3pQ2 / 12.40 SOL
+          </div>
+          <span class="tag bg-[var(--green)] text-[var(--ink)]">●&nbsp;ONLINE</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ribbon -->
+    <div class="bg-[var(--ink)] text-[var(--paper)] overflow-hidden">
+      <div class="max-w-6xl mx-auto px-6 py-1.5 flex justify-between text-[10px] stamp">
+        <span>NO CUSTODIAN ✕</span>
+        <span>NO KEEPER ✕</span>
+        <span>NO BACKDOOR ✕</span>
+        <span>ONLY CODE ●</span>
+        <span>ONLY TIME ●</span>
+        <span>PROGRAM 6gbT...fFu</span>
+      </div>
+    </div>
+
+    <!-- state toggle (mockup only) -->
+    <div class="max-w-6xl mx-auto px-6 pt-6">
+      <div class="flex items-center gap-3 stamp text-[10px]">
+        <span>[ PREVIEW MODE ]</span>
+        <button onclick="setState('locked')" class="btn !py-1.5 !px-3 !text-[10px]">
+          LOCKED
+        </button>
+        <button onclick="setState('claim')" class="btn !py-1.5 !px-3 !text-[10px]">
+          CLAIMABLE
+        </button>
+      </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto px-6 py-6 grid grid-cols-12 gap-5">
+      <!-- main status block -->
+      <section class="col-span-12 lg:col-span-8 space-y-5">
+        <div id="status-card" class="block-warn p-7 relative">
+          <div class="absolute top-3 right-3 rotate-tag">
+            <span id="rotate-stamp" class="tag bg-[var(--red)] text-[var(--paper)]">! VAULT ARMED !</span>
+          </div>
+
+          <div class="flex items-baseline justify-between mb-5">
+            <div>
+              <div class="stamp">VAULT &nbsp;//&nbsp; 8Hk9...vC3</div>
+              <div class="display text-3xl mt-1">5.00 SOL</div>
+            </div>
+          </div>
+
+          <div id="badge-row" class="mb-5">
+            <div
+              id="badge"
+              class="block-ink display text-3xl px-5 py-3 inline-block"
+            >
+              ▣ LOCKED
+            </div>
+          </div>
+
+          <div class="stamp mb-2"><span id="cd-label">UNLOCKS IN</span></div>
+          <div id="countdown" class="flex items-end gap-2 mb-6">
+            <div>
+              <div class="display text-[96px] leading-none tabular-nums">11</div>
+              <div class="stamp text-center">DAY</div>
+            </div>
+            <div class="display text-[96px] leading-none">:</div>
+            <div>
+              <div class="display text-[96px] leading-none tabular-nums">23</div>
+              <div class="stamp text-center">HR</div>
+            </div>
+            <div class="display text-[96px] leading-none">:</div>
+            <div>
+              <div class="display text-[96px] leading-none tabular-nums">47</div>
+              <div class="stamp text-center">MIN</div>
+            </div>
+            <div class="display text-[96px] leading-none">:</div>
+            <div>
+              <div class="display text-[96px] leading-none tabular-nums">12</div>
+              <div class="stamp text-center">SEC</div>
+            </div>
+          </div>
+
+          <!-- progress bars (chunky) -->
+          <div class="border-[3px] border-[var(--ink)] h-7 bg-[var(--paper)] flex">
+            <div id="progress" class="bg-[var(--ink)] h-full" style="width:63%"></div>
+            <div class="flex-1 hatch"></div>
+          </div>
+
+          <div class="perforation my-6"></div>
+
+          <div class="grid grid-cols-3 gap-0 text-xs border-[3px] border-[var(--ink)] divide-x-[3px] divide-[var(--ink)] bg-[var(--paper)]">
+            <div class="p-3">
+              <div class="stamp">BENEFICIARY</div>
+              <div class="display mt-1">9mNx...wYz4</div>
+            </div>
+            <div class="p-3">
+              <div class="stamp">LAST PING</div>
+              <div class="display mt-1">11.MAY 14:23</div>
+            </div>
+            <div class="p-3">
+              <div class="stamp"><span id="unlock-label">UNLOCKS</span></div>
+              <div id="unlocks" class="display mt-1">10.JUN 14:23</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- actions -->
+        <div class="grid grid-cols-3 gap-4">
+          <button id="btn-checkin" class="btn btn-primary">
+            ↑ CHECK_IN
+          </button>
+          <button id="btn-claim" disabled class="btn">◆ CLAIM</button>
+          <button class="btn btn-danger">✕ CANCEL</button>
+        </div>
+
+        <!-- ledger -->
+        <div class="block p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="stamp">LEDGER &nbsp;//&nbsp; ON-CHAIN HISTORY</div>
+            <div class="stamp text-[var(--ink)] opacity-60">SLOT 312094221</div>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between py-2 border-t-[3px] border-[var(--ink)] border-dotted">
+              <span><span class="tag mr-2">CHECK</span> tx&nbsp;4Hk9...8nQ</span>
+              <span class="display">11.MAY · 14:23</span>
+            </div>
+            <div class="flex justify-between py-2 border-t-[3px] border-[var(--ink)] border-dotted">
+              <span><span class="tag mr-2">CHECK</span> tx&nbsp;9aB2...Lm3</span>
+              <span class="display">11.APR · 09:01</span>
+            </div>
+            <div class="flex justify-between py-2 border-t-[3px] border-[var(--ink)] border-dotted">
+              <span><span class="tag mr-2 bg-[var(--blue)]">INIT</span> tx&nbsp;7mNq...rT5</span>
+              <span class="display">12.MAR · 10:44</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- right -->
+      <aside class="col-span-12 lg:col-span-4 space-y-5">
+        <div class="block p-5">
+          <div class="stamp mb-1">FORM A-01</div>
+          <div class="display text-xl mb-4">INITIALIZE VAULT</div>
+          <div class="space-y-3">
+            <div>
+              <label class="stamp">BENEFICIARY PUBKEY</label>
+              <input class="field mt-1" placeholder="9mNxXkZpRq...wYz4" value="9mNxXkZpRq...wYz4" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="stamp">INTERVAL [DAYS]</label>
+                <input class="field mt-1" value="30" />
+              </div>
+              <div>
+                <label class="stamp">AMOUNT [SOL]</label>
+                <input class="field mt-1" value="5.00" />
+              </div>
+            </div>
+            <button class="btn btn-primary w-full mt-2">▶ DEPLOY VAULT</button>
+            <div class="stamp text-[10px] opacity-60 text-center mt-2">
+              SIGNS WITH OWNER WALLET · 1 TX
+            </div>
+          </div>
+        </div>
+
+        <div class="block-ink p-5">
+          <div class="stamp text-[var(--yellow)] mb-3">PROTOCOL // NO TRUST</div>
+          <div class="space-y-2 text-sm leading-snug">
+            <div class="flex gap-3">
+              <span class="display text-[var(--yellow)] text-xl">01.</span>
+              <span>Owner locks SOL into a PDA seeded on their pubkey.</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="display text-[var(--yellow)] text-xl">02.</span>
+              <span>Owner pings (check_in) before the clock runs out.</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="display text-[var(--yellow)] text-xl">03.</span>
+              <span>If owner goes silent → beneficiary claims it forever.</span>
+            </div>
+            <div class="border-t-[3px] border-[var(--yellow)] border-dotted mt-3 pt-3 text-[var(--yellow)] stamp">
+              now &gt;= last_checkin + interval &nbsp;|&nbsp; on-chain Clock
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="border-t-[3px] border-[var(--ink)] mt-4">
+      <div class="max-w-6xl mx-auto px-6 py-3 flex justify-between text-[10px] stamp">
+        <span>PROGRAM 6gbTnghr...z5fFu</span>
+        <span>★ NOT A FINANCIAL CUSTODIAN ★</span>
+        <span>RPC api.devnet.solana.com</span>
+      </div>
+    </footer>
+
+    <script>
+      function setState(s) {
+        const card = document.getElementById("status-card");
+        const badge = document.getElementById("badge");
+        const rotateStamp = document.getElementById("rotate-stamp");
+        const cd = document.getElementById("countdown");
+        const checkin = document.getElementById("btn-checkin");
+        const claim = document.getElementById("btn-claim");
+        const unlocks = document.getElementById("unlocks");
+        const cdLabel = document.getElementById("cd-label");
+        const unlockLabel = document.getElementById("unlock-label");
+        const progress = document.getElementById("progress");
+
+        if (s === "locked") {
+          card.className = "block-warn p-7 relative";
+          badge.className = "block-ink display text-3xl px-5 py-3 inline-block";
+          badge.textContent = "▣ LOCKED";
+          rotateStamp.className = "tag bg-[var(--red)] text-[var(--paper)]";
+          rotateStamp.textContent = "! VAULT ARMED !";
+          cd.querySelectorAll(".text-\\[96px\\]").forEach((el, i, all) => {
+            const vals = ["11", ":", "23", ":", "47", ":", "12"];
+            if (i < vals.length) el.textContent = vals[i];
+          });
+          claim.disabled = true;
+          claim.classList.remove("btn-success");
+          checkin.disabled = false;
+          unlocks.textContent = "10.JUN 14:23";
+          cdLabel.textContent = "UNLOCKS IN";
+          unlockLabel.textContent = "UNLOCKS";
+          progress.style.width = "63%";
+        } else {
+          card.className = "block-live p-7 relative";
+          badge.className = "block-ink display text-3xl px-5 py-3 inline-block live-blink";
+          badge.textContent = "● CLAIMABLE";
+          rotateStamp.className = "tag bg-[var(--ink)] text-[var(--green)]";
+          rotateStamp.textContent = "★ READY TO CLAIM ★";
+          cd.querySelectorAll(".text-\\[96px\\]").forEach((el, i) => {
+            const vals = ["00", ":", "00", ":", "00", ":", "00"];
+            if (i < vals.length) el.textContent = vals[i];
+          });
+          claim.disabled = false;
+          claim.classList.add("btn-success");
+          checkin.disabled = true;
+          unlocks.textContent = "NOW · OPEN";
+          cdLabel.textContent = "VAULT OPEN";
+          unlockLabel.textContent = "STATUS";
+          progress.style.width = "100%";
+        }
+      }
+    </script>
+  </body>
+</html>
