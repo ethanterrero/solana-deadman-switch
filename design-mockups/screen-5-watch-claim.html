@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Screen 5 — Watch &amp; Claim · Dead Man's Switch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #000000;
+        --panel: #0a0a0a;
+        --panel-2: #0f0f0f;
+        --border: #1f1f1f;
+        --green: #00ff88;
+        --green-deep: #00aa5a;
+        --violet: #a78bfa;
+        --violet-deep: #7c3aed;
+        --amber: #ffb020;
+        --red: #ff3355;
+        --text: #e8e8e8;
+        --muted: #6a6a6a;
+
+        /* state-driven (set by body.state-*) */
+        --status: var(--violet);
+        --status-deep: var(--violet-deep);
+        --status-glow: rgba(167, 139, 250, 0.5);
+        --tick-speed: 2200ms;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.025) 0,
+          rgba(255, 255, 255, 0.025) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        pointer-events: none;
+        z-index: 100;
+        mix-blend-mode: overlay;
+      }
+      .grid-bg {
+        background-image: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          );
+        background-size: 40px 40px;
+      }
+      /* radial vignette that intensifies on claimable */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 70% 50% at center,
+          transparent 0%,
+          transparent 60%,
+          var(--status-glow) 110%
+        );
+        z-index: 50;
+        opacity: 0.18;
+        transition: opacity 600ms;
+      }
+      body.state-claimable::after { opacity: 0.55; }
+      body.state-claimable {
+        background: radial-gradient(ellipse at center, rgba(0,255,136,.08) 0%, #000 70%);
+      }
+
+      /* === STATE PALETTES === */
+      body.state-empty     { --status: var(--green); --status-deep: var(--green-deep); --status-glow: rgba(0,255,136,.35); }
+      body.state-watching  { --status: var(--violet); --status-deep: var(--violet-deep); --status-glow: rgba(167,139,250,.45); --tick-speed: 2400ms; }
+      body.state-nearing   { --status: var(--violet); --status-deep: var(--violet-deep); --status-glow: rgba(167,139,250,.6); --tick-speed: 1200ms; }
+      body.state-claimable { --status: var(--green); --status-deep: var(--green-deep); --status-glow: rgba(0,255,136,.6); --tick-speed: 800ms; }
+      body.state-claimed   { --status: var(--green-deep); --status-deep: var(--green-deep); --status-glow: rgba(0,170,90,.35); }
+
+      /* === ATOMS === */
+      .stamp {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .glow-status { text-shadow: 0 0 14px var(--status-glow), 0 0 32px var(--status-glow); }
+      .glow-green { text-shadow: 0 0 12px rgba(0,255,136,.7), 0 0 32px rgba(0,255,136,.35); }
+      .glow-violet { text-shadow: 0 0 12px rgba(167,139,250,.7), 0 0 32px rgba(167,139,250,.35); }
+      .blink { animation: blink 1.2s steps(2, jump-none) infinite; }
+      @keyframes blink { 50% { opacity: 0.18; } }
+
+      /* heartbeat */
+      .heartbeat {
+        width: 8px; height: 8px; border-radius: 999px;
+        background: var(--status);
+        box-shadow: 0 0 10px var(--status);
+        animation: heartbeat var(--tick-speed) ease-in-out infinite;
+      }
+      @keyframes heartbeat {
+        0%, 60%, 100% { transform: scale(1); opacity: 1; }
+        20% { transform: scale(1.5); opacity: 0.7; }
+        30% { transform: scale(1); opacity: 1; }
+        45% { transform: scale(1.3); opacity: 0.85; }
+      }
+
+      .wallet-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.55rem 0.9rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+      }
+      .dot-green {
+        width: 6px; height: 6px; border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+      .back-link {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.7rem;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        padding: 0.55rem 0.9rem;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        transition: all 200ms;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        cursor: pointer;
+      }
+      .back-link:hover { color: var(--text); border-color: var(--green); }
+
+      .corner {
+        position: absolute;
+        width: 18px; height: 18px;
+        border-color: var(--status);
+        opacity: 0.55;
+        transition: all 400ms;
+      }
+      .corner.tl { top: 20px; left: 20px; border-top: 1px solid; border-left: 1px solid; }
+      .corner.tr { top: 20px; right: 20px; border-top: 1px solid; border-right: 1px solid; }
+      .corner.bl { bottom: 20px; left: 20px; border-bottom: 1px solid; border-left: 1px solid; }
+      .corner.br { bottom: 20px; right: 20px; border-bottom: 1px solid; border-right: 1px solid; }
+      body.state-claimable .corner {
+        opacity: 1;
+        width: 28px; height: 28px;
+        animation: cornerPulse var(--tick-speed) ease-in-out infinite;
+      }
+      @keyframes cornerPulse { 50% { box-shadow: 0 0 24px var(--status); } }
+
+      /* === SECTION VISIBILITY (state-driven) === */
+      .section { display: none; }
+      body.state-empty .section.empty-only { display: block; }
+      body.state-watching .section.watching-only,
+      body.state-nearing .section.watching-only,
+      body.state-claimable .section.watching-only,
+      body.state-claimed .section.watching-only { display: block; }
+      body.state-watching .section.active-only,
+      body.state-nearing .section.active-only { display: block; }
+      body.state-claimable .section.claimable-only { display: block; }
+      body.state-claimed .section.claimed-only { display: block; }
+
+      /* === EMPTY STATE === */
+      .empty-stage {
+        max-width: 720px;
+        margin: 4rem auto 2rem;
+        padding: 0 1.5rem;
+        text-align: center;
+      }
+      .empty-glyph {
+        width: 92px; height: 92px;
+        margin: 0 auto 2rem;
+        filter: drop-shadow(0 0 24px rgba(167, 139, 250, 0.4));
+      }
+      .empty-glyph svg { width: 100%; height: 100%; }
+      .empty-title {
+        font-size: clamp(1.8rem, 4vw, 3rem);
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        line-height: 1.05;
+        margin: 0;
+      }
+      .empty-title .pf { color: var(--status); }
+      .empty-sub {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin-top: 1rem;
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.55;
+      }
+      .empty-input-wrap {
+        max-width: 540px;
+        margin: 2.5rem auto 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .field-big {
+        background: #050505;
+        border: 1px solid var(--border);
+        padding: 1.2rem 1.4rem;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--text);
+        width: 100%;
+        font-size: clamp(1rem, 2vw, 1.4rem);
+        font-weight: 600;
+        text-align: center;
+        outline: none;
+        transition: all 220ms;
+      }
+      .field-big:focus {
+        border-color: var(--violet);
+        box-shadow: 0 0 0 1px var(--violet), 0 0 40px rgba(167,139,250,.18);
+        background: #07060c;
+      }
+      .btn {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        padding: 1rem 2rem;
+        border: 2px solid var(--violet);
+        background: transparent;
+        color: var(--violet);
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 200ms;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.8rem;
+      }
+      .btn:hover:not(:disabled) {
+        background: var(--violet);
+        color: #000;
+        box-shadow: 0 0 40px rgba(167,139,250,.4);
+      }
+      .empty-hint {
+        margin-top: 2.5rem;
+        font-size: 0.78rem;
+        color: var(--muted);
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.6;
+      }
+      .empty-hint .planned {
+        color: var(--green-deep);
+        font-style: italic;
+      }
+
+      /* === WATCHING / NEARING / CLAIMABLE COMMON === */
+      .ribbon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        padding: 0.8rem 1.5rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        font-size: 0.75rem;
+        letter-spacing: 0.12em;
+        flex-wrap: wrap;
+      }
+      .ribbon-label { color: var(--muted); margin-right: 0.4rem; font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase; }
+      .ribbon-divider { color: var(--muted); }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.6rem 1.2rem;
+        border: 1px solid var(--status);
+        color: var(--status);
+        font-weight: 700;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        background: rgba(0,0,0,.6);
+        box-shadow: 0 0 24px var(--status-glow);
+      }
+      body.state-nearing .status-badge { animation: badgePulse 1.4s ease-in-out infinite; }
+      body.state-claimable .status-badge { animation: badgePulse .8s ease-in-out infinite; }
+      @keyframes badgePulse { 50% { transform: scale(1.04); } }
+
+      .prompt-above {
+        text-align: center;
+        font-size: 0.85rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin: 1.5rem 0 0.8rem;
+      }
+
+      /* === COUNTDOWN === */
+      .countdown {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 0.4rem;
+      }
+      .cd-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 1.5em;
+      }
+      .cd-digit {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 900;
+        font-size: clamp(4rem, 15vw, 13rem);
+        line-height: 0.85;
+        color: var(--status);
+        text-shadow: 0 0 24px var(--status-glow), 0 0 64px var(--status-glow);
+        letter-spacing: -0.05em;
+        font-variant-numeric: tabular-nums;
+        transition: text-shadow 200ms;
+      }
+      .cd-digit.tick {
+        animation: tickFlash 350ms cubic-bezier(.2,.8,.2,1);
+      }
+      @keyframes tickFlash {
+        0% { transform: scale(1.06); text-shadow: 0 0 40px var(--status), 0 0 96px var(--status); filter: brightness(1.6); }
+        100% { transform: scale(1); }
+      }
+      .cd-sep {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 900;
+        font-size: clamp(3rem, 12vw, 10rem);
+        line-height: 0.85;
+        color: var(--status);
+        opacity: 0.4;
+        padding-top: 0.3em;
+      }
+      .cd-label {
+        font-size: 0.7rem;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-top: 0.8rem;
+      }
+
+      /* === BIG AMOUNT === */
+      .amount-block {
+        text-align: center;
+        margin: 2.5rem auto 0;
+      }
+      .amount-pre {
+        font-size: 0.85rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+      }
+      .amount-value {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 900;
+        font-size: clamp(3rem, 9vw, 7.5rem);
+        line-height: 0.9;
+        color: var(--green);
+        text-shadow: 0 0 28px rgba(0,255,136,.5), 0 0 80px rgba(0,255,136,.25);
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+      }
+      body.state-watching .amount-value { color: var(--green-deep); text-shadow: 0 0 24px rgba(0,170,90,.3); }
+      body.state-claimable .amount-value {
+        color: var(--green);
+        animation: amountBreathe 1.6s ease-in-out infinite;
+      }
+      @keyframes amountBreathe {
+        0%, 100% { text-shadow: 0 0 30px rgba(0,255,136,.5), 0 0 80px rgba(0,255,136,.3); }
+        50% { text-shadow: 0 0 60px rgba(0,255,136,.85), 0 0 120px rgba(0,255,136,.55); }
+      }
+
+      /* === CLAIM CTA === */
+      .hero-claim {
+        position: relative;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1.7rem 4rem;
+        background: transparent;
+        border: 2px solid var(--status);
+        color: var(--status);
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        cursor: pointer;
+        font-size: 1.25rem;
+        transition: all 280ms cubic-bezier(.2,.8,.2,1);
+        text-decoration: none;
+        min-width: 360px;
+      }
+      .hero-claim:disabled { cursor: not-allowed; opacity: 0.5; }
+      .hero-claim::before, .hero-claim::after {
+        content: "";
+        position: absolute;
+        width: 14px; height: 14px;
+        border: 2px solid var(--status);
+      }
+      .hero-claim::before { top: -10px; left: -10px; border-right: 0; border-bottom: 0; }
+      .hero-claim::after { bottom: -10px; right: -10px; border-left: 0; border-top: 0; }
+
+      body.state-claimable .hero-claim {
+        animation: claimBreathe 2s ease-in-out infinite;
+        border-width: 3px;
+      }
+      @keyframes claimBreathe {
+        0%, 100% { box-shadow: 0 0 40px rgba(0,255,136,.4), inset 0 0 24px rgba(0,255,136,.06); }
+        50% { box-shadow: 0 0 100px rgba(0,255,136,.75), inset 0 0 40px rgba(0,255,136,.15); }
+      }
+      body.state-claimable .hero-claim:hover {
+        background: var(--green);
+        color: #000;
+        box-shadow: 0 0 120px rgba(0,255,136,.75), inset 0 0 40px rgba(255,255,255,.2);
+        letter-spacing: 0.28em;
+      }
+      .hero-claim .sub {
+        font-size: 0.7rem;
+        letter-spacing: 0.22em;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      body.state-claimable .hero-claim .sub { color: var(--green-deep); }
+      body.state-claimable .hero-claim:hover .sub { color: #003319; }
+
+      /* === FOOTER === */
+      .footer {
+        margin-top: 4rem;
+        padding: 1.2rem 0;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .footer-link {
+        font-size: 0.7rem;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-decoration: none;
+        cursor: pointer;
+        transition: color 200ms;
+        padding: 0.45rem 0.8rem;
+        border: 1px solid transparent;
+      }
+      .footer-link:hover { color: var(--text); border-color: var(--border); }
+
+      /* === CLAIMED state === */
+      .claimed-stage {
+        max-width: 640px;
+        margin: 3rem auto 0;
+        text-align: center;
+      }
+      .claimed-mark {
+        width: 96px; height: 96px;
+        border-radius: 999px;
+        background: rgba(0, 255, 136, 0.08);
+        border: 2px solid var(--green);
+        margin: 0 auto 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        color: var(--green);
+        text-shadow: 0 0 24px var(--green);
+        animation: claimedPulse 2.4s ease-in-out infinite;
+      }
+      @keyframes claimedPulse {
+        0%, 100% { box-shadow: 0 0 0 rgba(0,255,136,0); }
+        50% { box-shadow: 0 0 40px rgba(0,255,136,.3); }
+      }
+      .claimed-title {
+        font-size: clamp(1.6rem, 3.6vw, 2.4rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.4rem;
+        color: var(--text);
+      }
+      .claimed-meta {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.7;
+        margin-top: 1.5rem;
+      }
+      .claimed-meta .strong { color: var(--text); font-weight: 600; }
+      .claimed-meta a { color: var(--green); text-decoration: underline; text-underline-offset: 3px; }
+
+      /* === MOCKUP STATE TOGGLE === */
+      .state-toggle {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+      .state-toggle button {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        padding: 0.4rem 0.65rem;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        transition: all 180ms;
+      }
+      .state-toggle button:hover { color: var(--text); }
+      .state-toggle button.on {
+        background: var(--panel-2);
+        border-color: var(--status);
+        color: var(--status);
+        box-shadow: 0 0 10px var(--status-glow);
+      }
+
+      /* === CLAIM TRANSITION FLASH === */
+      .flash-white {
+        position: fixed;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 200;
+        pointer-events: none;
+        opacity: 0;
+        animation: flashWhite 800ms ease-out forwards;
+      }
+      @keyframes flashWhite {
+        0% { opacity: 0; }
+        15% { opacity: 0.85; }
+        100% { opacity: 0; }
+      }
+
+      .race-warning {
+        background: rgba(255, 51, 85, 0.08);
+        border: 1px solid rgba(255, 51, 85, 0.3);
+        border-left: 2px solid var(--red);
+        padding: 0.8rem 1rem;
+        font-size: 0.78rem;
+        color: var(--muted);
+        line-height: 1.5;
+        display: flex;
+        gap: 0.7rem;
+        margin-top: 1.5rem;
+      }
+      .race-warning .ic { color: var(--red); font-size: 0.95rem; line-height: 1.5; }
+      .race-warning strong { color: var(--red); }
+    </style>
+  </head>
+  <body class="grid-bg state-empty">
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+
+    <!-- TOPBAR -->
+    <header class="px-10 py-6 flex justify-between items-center flex-wrap gap-3">
+      <div class="flex items-center gap-3 flex-wrap">
+        <a href="screen-2-identify.html" class="back-link">
+          <span>◀</span><span>EXIT</span>
+        </a>
+        <div class="wallet-pill">
+          <span class="dot-green"></span>
+          <span class="stamp" style="color:var(--text)">BENEFICIARY</span>
+          <span class="text-xs text-[var(--muted)]">·</span>
+          <span class="text-xs">9mNx...wYz4</span>
+          <span class="text-xs text-[var(--muted)]">·</span>
+          <span class="text-xs text-[var(--green)] glow-green">3.20 SOL</span>
+        </div>
+      </div>
+
+      <!-- mockup-only state preview -->
+      <div class="state-toggle">
+        <button onclick="setState('empty')" data-state="empty" class="on">EMPTY</button>
+        <button onclick="setState('watching')" data-state="watching">WATCHING</button>
+        <button onclick="setState('nearing')" data-state="nearing">NEARING &lt;1m</button>
+        <button onclick="setState('claimable')" data-state="claimable">CLAIMABLE</button>
+        <button onclick="setState('claimed')" data-state="claimed">CLAIMED</button>
+      </div>
+    </header>
+
+    <!-- ============== EMPTY STATE ============== -->
+    <section class="section empty-only">
+      <div class="empty-stage">
+        <div class="empty-glyph">
+          <!-- watching eye glyph -->
+          <svg viewBox="0 0 100 100" fill="none">
+            <ellipse cx="50" cy="50" rx="44" ry="28" stroke="var(--violet)" stroke-width="1.6" />
+            <circle cx="50" cy="50" r="16" stroke="var(--violet)" stroke-width="1.6" />
+            <circle cx="50" cy="50" r="5" fill="var(--violet)" />
+            <!-- tick marks -->
+            <line x1="50" y1="14" x2="50" y2="22" stroke="var(--violet)" stroke-width="1.2" opacity="0.6" />
+            <line x1="50" y1="78" x2="50" y2="86" stroke="var(--violet)" stroke-width="1.2" opacity="0.6" />
+            <line x1="6" y1="50" x2="14" y2="50" stroke="var(--violet)" stroke-width="1.2" opacity="0.6" />
+            <line x1="86" y1="50" x2="94" y2="50" stroke="var(--violet)" stroke-width="1.2" opacity="0.6" />
+          </svg>
+        </div>
+
+        <div class="stamp glow-violet" style="color:var(--violet); margin-bottom: 1rem">
+          WATCH A VAULT
+        </div>
+        <h1 class="empty-title">
+          <span class="pf">&gt;</span> WHOSE COUNTDOWN<br/>ARE YOU WATCHING?<span class="text-[var(--violet)] blink">_</span>
+        </h1>
+        <p class="empty-sub">
+          enter the wallet address of someone who set a dead man's switch
+          with you as beneficiary. we'll show you their countdown — and the
+          CLAIM button unlocks when it hits zero.
+        </p>
+
+        <div class="empty-input-wrap">
+          <input
+            id="owner-input"
+            class="field-big"
+            placeholder="7xK4Nq...3pQ2"
+            value="7xK4NqRsTpVwXyZ1AbCdEfGhJkLmNpQrStUw9V8MzPq2"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button onclick="loadVault()" class="btn">
+            <span>LOAD VAULT</span><span>▶▶</span>
+          </button>
+        </div>
+
+        <div class="empty-hint">
+          <span class="planned">planned:</span>
+          auto-discover all switches naming your wallet as beneficiary via
+          <code style="color:var(--violet)">getProgramAccounts</code> filtered by
+          <code style="color:var(--violet)">beneficiary == 9mNx...wYz4</code>.
+          for the demo, paste an owner address above.
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== WATCHING / NEARING / CLAIMABLE (shared) ============== -->
+    <section class="section watching-only">
+      <main class="max-w-5xl mx-auto px-6 py-2">
+        <!-- vault info ribbon -->
+        <div class="ribbon mb-8">
+          <span><span class="ribbon-label">WATCHING</span><span class="text-[var(--text)]" id="watch-owner">7xK4...3pQ2</span></span>
+          <span class="ribbon-divider">·</span>
+          <span><span class="ribbon-label">VAULT</span><span class="text-[var(--text)]">8Hk9...vC3</span></span>
+          <span class="ribbon-divider">·</span>
+          <span><span class="ribbon-label">INTERVAL</span><span class="text-[var(--text)]">30 DAYS</span></span>
+        </div>
+
+        <!-- status badge -->
+        <div class="flex items-center justify-center gap-3 mb-6">
+          <span class="heartbeat"></span>
+          <div class="status-badge">
+            <span class="text-lg" style="line-height:0" id="status-icon">◇</span>
+            <span id="status-text">WATCHING · OWNER IS ACTIVE</span>
+          </div>
+          <span class="stamp" id="status-sub">they're still here</span>
+        </div>
+
+        <!-- ACTIVE / NEARING countdown stage -->
+        <div class="section active-only">
+          <div class="prompt-above" id="cd-prelabel">IF THEY STAY SILENT FOR</div>
+          <div class="countdown" id="countdown">
+            <div class="cd-cell">
+              <div class="cd-digit" id="cd-d">11</div>
+              <div class="cd-label">DAYS</div>
+            </div>
+            <div class="cd-sep">:</div>
+            <div class="cd-cell">
+              <div class="cd-digit" id="cd-h">23</div>
+              <div class="cd-label">HRS</div>
+            </div>
+            <div class="cd-sep">:</div>
+            <div class="cd-cell">
+              <div class="cd-digit" id="cd-m">47</div>
+              <div class="cd-label">MIN</div>
+            </div>
+            <div class="cd-sep">:</div>
+            <div class="cd-cell">
+              <div class="cd-digit" id="cd-s">12</div>
+              <div class="cd-label">SEC</div>
+            </div>
+          </div>
+
+          <div class="amount-block">
+            <div class="amount-pre">THIS WILL BECOME YOURS</div>
+            <div class="amount-value">5.00 SOL</div>
+          </div>
+
+          <div class="flex justify-center mt-12">
+            <button id="claim-btn-locked" class="hero-claim" disabled>
+              <span>◆ CLAIM</span>
+              <span class="sub">unlocks at 00:00:00:00</span>
+            </button>
+          </div>
+
+          <div class="text-center mt-6 text-sm text-[var(--muted)]">
+            owner last checked in · <span class="text-[var(--text)] font-semibold">May 11, 14:23 UTC</span>
+            <span class="text-[var(--muted)]"> · </span>
+            <span class="text-[var(--green-deep)] text-xs">tx 4Hk9...8nQ</span>
+          </div>
+          <div class="text-center mt-1 text-sm">
+            unlocks for you · <span class="text-[var(--violet)]">Jun 10, 14:23 UTC</span>
+          </div>
+        </div>
+
+        <!-- CLAIMABLE stage -->
+        <div class="section claimable-only">
+          <div class="prompt-above" style="color:var(--green); letter-spacing: 0.4em">
+            THE OWNER WENT SILENT
+          </div>
+          <div class="countdown" id="countdown-zero">
+            <div class="cd-cell"><div class="cd-digit">00</div><div class="cd-label">DAYS</div></div>
+            <div class="cd-sep">:</div>
+            <div class="cd-cell"><div class="cd-digit">00</div><div class="cd-label">HRS</div></div>
+            <div class="cd-sep">:</div>
+            <div class="cd-cell"><div class="cd-digit">00</div><div class="cd-label">MIN</div></div>
+            <div class="cd-sep">:</div>
+            <div class="cd-cell"><div class="cd-digit">00</div><div class="cd-label">SEC</div></div>
+          </div>
+
+          <div class="amount-block">
+            <div class="amount-pre">THIS VAULT IS YOURS</div>
+            <div class="amount-value">5.00 SOL</div>
+          </div>
+
+          <div class="flex justify-center mt-12">
+            <button id="claim-btn" class="hero-claim" onclick="executeClaim()">
+              <span>▸ CLAIM 5.00 SOL</span>
+              <span class="sub">press [ space ] or click · 1 tx</span>
+            </button>
+          </div>
+
+          <div class="race-warning max-w-2xl mx-auto">
+            <span class="ic">⚠</span>
+            <span>
+              <strong>this is a race.</strong> the owner can still
+              <code style="color:var(--text)">check_in</code> to reset the timer
+              before you broadcast. claim quickly — once your tx confirms,
+              the funds are yours.
+            </span>
+          </div>
+        </div>
+
+        <!-- CLAIMED stage -->
+        <div class="section claimed-only">
+          <div class="claimed-stage">
+            <div class="claimed-mark">✓</div>
+            <h2 class="claimed-title">YOU INHERITED THIS VAULT.</h2>
+            <p class="text-[var(--muted)]" style="font-size: 0.9rem; margin-top: 0.4rem">
+              the on-chain <code style="color:var(--green)">Claimed</code> event fired.
+              the switch PDA is now closed — rent reclaimed alongside the funds.
+            </p>
+
+            <div class="amount-block">
+              <div class="amount-pre">RECEIVED</div>
+              <div class="amount-value">5.00 SOL</div>
+            </div>
+
+            <div class="claimed-meta">
+              from · <span class="strong">7xK4...3pQ2</span>
+              <br/>
+              tx · <a href="#" onclick="alert('opens Solana Explorer')">5fNm9pQrTzWxLkBcDfGhJ7Y2...</a>
+              <br/>
+              new balance · <span class="strong" style="color:var(--green)">8.20 SOL</span>
+            </div>
+
+            <div class="mt-8">
+              <a href="screen-2-identify.html" class="btn" style="border-color: var(--green-deep); color: var(--green-deep)">
+                ◀ BACK TO IDENTIFY
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- shared footer -->
+        <div class="footer section active-only">
+          <a class="footer-link" onclick="setState('empty')">◀ STOP WATCHING · clear this vault</a>
+          <div class="flex gap-2">
+            <a class="footer-link" onclick="alert('planned: subscribe to a notification for when this vault becomes claimable. lives in the same Supabase reminders table but with role=beneficiary.')">⌖ ALERT WHEN CLAIMABLE</a>
+            <a class="footer-link" onclick="alert('opens Solana Explorer to inspect the switch PDA + on-chain history')">VIEW ON EXPLORER ▸</a>
+          </div>
+        </div>
+      </main>
+    </section>
+
+    <script>
+      // === STATE MACHINE ===
+      let currentState = "empty";
+      let ticker = null;
+      let remaining = 0;
+      let lastSec = -1;
+
+      const dEl = () => document.getElementById("cd-d");
+      const hEl = () => document.getElementById("cd-h");
+      const mEl = () => document.getElementById("cd-m");
+      const sEl = () => document.getElementById("cd-s");
+
+      function pad(n) { return n.toString().padStart(2, "0"); }
+
+      function render() {
+        if (currentState !== "watching" && currentState !== "nearing") return;
+        const r = Math.max(0, remaining);
+        const days = Math.floor(r / 86400);
+        const hours = Math.floor((r % 86400) / 3600);
+        const mins = Math.floor((r % 3600) / 60);
+        const secs = r % 60;
+
+        dEl().textContent = pad(days);
+        hEl().textContent = pad(hours);
+        mEl().textContent = pad(mins);
+        sEl().textContent = pad(secs);
+
+        if (secs !== lastSec) {
+          sEl().classList.remove("tick");
+          void sEl().offsetWidth;
+          sEl().classList.add("tick");
+          lastSec = secs;
+        }
+      }
+
+      function startTicker() {
+        if (ticker) clearInterval(ticker);
+        ticker = setInterval(() => {
+          if ((currentState === "watching" || currentState === "nearing") && remaining > 0) {
+            remaining -= 1;
+            render();
+            if (remaining === 0) {
+              // THE MOMENT — auto-transition to claimable
+              transitionToClaimable();
+            }
+          }
+        }, 1000);
+      }
+
+      function stopTicker() {
+        if (ticker) { clearInterval(ticker); ticker = null; }
+      }
+
+      function setState(s) {
+        document.body.classList.remove(
+          "state-empty", "state-watching", "state-nearing", "state-claimable", "state-claimed"
+        );
+        document.body.classList.add("state-" + s);
+        currentState = s;
+
+        const statusText = document.getElementById("status-text");
+        const statusIcon = document.getElementById("status-icon");
+        const statusSub = document.getElementById("status-sub");
+        const cdPre = document.getElementById("cd-prelabel");
+
+        switch (s) {
+          case "empty":
+            stopTicker();
+            break;
+          case "watching":
+            remaining = 11 * 86400 + 23 * 3600 + 47 * 60 + 12;
+            if (statusText) { statusText.textContent = "WATCHING · OWNER IS ACTIVE"; }
+            if (statusIcon) { statusIcon.textContent = "◇"; }
+            if (statusSub) { statusSub.textContent = "they're still here"; }
+            if (cdPre) cdPre.textContent = "IF THEY STAY SILENT FOR";
+            render();
+            startTicker();
+            break;
+          case "nearing":
+            remaining = 47; // 47 seconds — ticks down in real time to 0
+            if (statusText) { statusText.textContent = "NEARING ZERO · STAY READY"; }
+            if (statusIcon) { statusIcon.textContent = "◇"; }
+            if (statusSub) { statusSub.textContent = "any moment now"; }
+            if (cdPre) cdPre.textContent = "UNTIL CLAIMABLE";
+            render();
+            startTicker();
+            break;
+          case "claimable":
+            stopTicker();
+            remaining = 0;
+            if (statusText) { statusText.textContent = "● READY TO CLAIM"; }
+            if (statusIcon) { statusIcon.textContent = "●"; }
+            if (statusSub) { statusSub.textContent = "claim before they race"; }
+            break;
+          case "claimed":
+            stopTicker();
+            if (statusText) { statusText.textContent = "✓ CLAIMED"; }
+            if (statusIcon) { statusIcon.textContent = "✓"; }
+            if (statusSub) { statusSub.textContent = "vault closed"; }
+            break;
+        }
+
+        document.querySelectorAll(".state-toggle button").forEach((b) => {
+          b.classList.toggle("on", b.dataset.state === s);
+        });
+      }
+
+      function transitionToClaimable() {
+        stopTicker();
+        // dramatic flash
+        const flash = document.createElement("div");
+        flash.className = "flash-white";
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 800);
+        // flip state after a beat
+        setTimeout(() => setState("claimable"), 250);
+      }
+
+      function loadVault() {
+        const v = document.getElementById("owner-input").value.trim();
+        if (v.length < 32) {
+          alert("enter a valid Solana wallet address (base58, ~44 chars)");
+          return;
+        }
+        // mockup: simulate getAccountInfo lookup
+        const overlay = document.createElement("div");
+        overlay.style.cssText = `
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,.92);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 200; flex-direction: column; gap: 1.25rem;
+          font-family: "JetBrains Mono", monospace;
+          color: var(--violet);
+          animation: fadeIn 200ms ease;
+        `;
+        overlay.innerHTML = `
+          <div style="font-size:.65rem; letter-spacing:.32em; color:#888">QUERYING DEVNET</div>
+          <div style="font-size:1.4rem; font-weight:800; color:#a78bfa; text-shadow: 0 0 20px rgba(167,139,250,.6);">
+            getAccountInfo(switch_pda)<span style="animation: blink 1s steps(2) infinite">_</span>
+          </div>
+          <div style="font-size:.75rem; color:#666; max-width: 440px; text-align:center; line-height:1.6">
+            derive PDA from owner pubkey → fetch account → decode Switch struct →
+            verify <span style="color:#a78bfa">beneficiary == 9mNx...wYz4</span>
+          </div>
+          <style>@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }</style>
+        `;
+        document.body.appendChild(overlay);
+        // shorten owner display
+        document.getElementById("watch-owner").textContent = v.slice(0, 4) + "..." + v.slice(-4);
+        setTimeout(() => {
+          overlay.remove();
+          setState("watching");
+        }, 1200);
+      }
+
+      function executeClaim() {
+        // wallet sign + broadcast
+        const overlay = document.createElement("div");
+        overlay.style.cssText = `
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,.94);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 200; flex-direction: column; gap: 1.5rem;
+          font-family: "JetBrains Mono", monospace;
+          color: var(--green);
+          animation: fadeIn 200ms ease;
+        `;
+        overlay.innerHTML = `
+          <div style="font-size:.65rem; letter-spacing:.32em; color:#888">SIGNING TRANSACTION</div>
+          <div style="font-size:2rem; font-weight:800; color:#00FF88; text-shadow: 0 0 24px rgba(0,255,136,.7);">
+            claim()<span style="animation: blink 1s steps(2) infinite">_</span>
+          </div>
+          <div style="font-size:.85rem; color:#888; max-width: 460px; text-align:center; line-height:1.6">
+            require <span style="color:#00FF88">now >= last_checkin + interval</span> →
+            transfer lamports → close Switch PDA →
+            emit <span style="color:#00FF88">Claimed</span> event
+          </div>
+          <div><div style="height:2px; width:240px; background:#1f1f1f; position:relative; overflow:hidden;">
+            <div style="height:100%; width:0%; background:#00FF88; box-shadow:0 0 12px #00FF88; animation: claimPgrs 1800ms ease forwards"></div>
+          </div></div>
+          <style>
+            @keyframes claimPgrs { to { width: 100%; } }
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          </style>
+        `;
+        document.body.appendChild(overlay);
+        setTimeout(() => {
+          overlay.remove();
+          setState("claimed");
+        }, 2000);
+      }
+
+      // === KEYBOARD ===
+      document.addEventListener("keydown", (e) => {
+        // space → claim if claimable
+        if ((e.key === " " || e.code === "Space") && currentState === "claimable") {
+          e.preventDefault();
+          executeClaim();
+        }
+        // enter on empty input → load
+        else if (e.key === "Enter" && currentState === "empty") {
+          loadVault();
+        }
+      });
+
+      // initial
+      setState("empty");
+    </script>
+  </body>
+</html>
