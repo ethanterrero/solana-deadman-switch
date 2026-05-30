@@ -23,7 +23,8 @@
         --amber-dim: #b87a14;
         --red: #ff3355;
         --text: #e8e8e8;
-        --muted: #6a6a6a;
+        --muted: #9a9a9a;      /* WCAG AA: 5.5:1 on #000 */
+        --muted-deep: #6a6a6a; /* old --muted, decorative only */
       }
       * { box-sizing: border-box; }
       html, body {
@@ -566,6 +567,50 @@
         line-height: 1.55;
       }
       .privacy-note strong { color: var(--text); font-weight: 600; }
+
+      /* === ACCESSIBILITY === */
+      :focus { outline: none; }
+      :focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
+      }
+      .btn:focus-visible,
+      .btn-next:focus-visible,
+      .btn-arm:focus-visible,
+      .preset:focus-visible,
+      .back-link:focus-visible,
+      .channel-toggle:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.18);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+        .blink, .pulse-red, .step {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* Touch target floor */
+      .preset { min-height: 40px; }
+      .btn, .btn-next, .btn-arm { min-height: 44px; }
     </style>
   </head>
   <body class="grid-bg">

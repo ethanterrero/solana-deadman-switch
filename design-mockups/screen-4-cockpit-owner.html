@@ -25,7 +25,8 @@
         --red: #ff3355;
         --red-deep: #cc1f3f;
         --text: #e8e8e8;
-        --muted: #6a6a6a;
+        --muted: #9a9a9a;      /* WCAG AA: 5.5:1 on #000 (was #6a6a6a → failed at 3.1:1) */
+        --muted-deep: #6a6a6a; /* old --muted, kept for non-text decorative use */
 
         /* state-driven (set by body.state-*) */
         --status: var(--amber);
@@ -672,6 +673,62 @@
       }
       .modal-channel.on .pip-mini { background: rgba(0,255,136,.2); border-color: var(--green); }
       .modal-channel.on .pip-mini::after { left: 13px; background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+      /* === ACCESSIBILITY === */
+
+      /* Visible focus rings for keyboard users — hidden for mouse-only */
+      :focus { outline: none; }
+      :focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
+      }
+      .btn:focus-visible,
+      .sec-btn:focus-visible,
+      .hero-cta:focus-visible,
+      .modal-btn:focus-visible,
+      .back-link:focus-visible,
+      .footer-link:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.18);
+      }
+
+      /* Reduced motion — disable transforms / animation for users with vestibular issues */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+        .blink, .heartbeat, body.state-critical .corner, body.state-expired .corner {
+          animation: none !important;
+          opacity: 1 !important;
+        }
+        .hero-cta { animation: none !important; }
+        .cd-digit.tick { animation: none !important; transform: none !important; filter: none !important; }
+      }
+
+      /* Visually-hidden text for screen readers (announces icon-only buttons) */
+      .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* Touch target floor — WCAG 2.1 minimum is 44x44px */
+      .sec-btn { min-height: 44px; }
+      .modal-btn { min-height: 44px; }
+      .footer-link { min-height: 36px; display: inline-flex; align-items: center; }
+
+      /* === DEMO MODE === */
+      /* State toggle visible only when ?demo=1 in URL */
+      .demo-only { display: none !important; }
+      body.demo-mode .demo-only { display: flex !important; }
     </style>
   </head>
   <body class="grid-bg state-active">
@@ -700,12 +757,12 @@
         </div>
       </div>
 
-      <!-- MOCKUP-ONLY: state preview toggle -->
-      <div class="state-toggle">
-        <button onclick="setState('active', 11*86400 + 23*3600 + 47*60 + 12)" class="on" data-state="active">ACTIVE</button>
-        <button onclick="setState('warning', 12*3600 + 14*60 + 38)" data-state="warning">WARN &lt;24h</button>
-        <button onclick="setState('critical', 47)" data-state="critical">CRIT &lt;1m</button>
-        <button onclick="setState('expired', 0)" data-state="expired">EXPIRED</button>
+      <!-- MOCKUP-ONLY: state preview toggle (hidden unless ?demo=1) -->
+      <div class="state-toggle demo-only" role="group" aria-label="Preview countdown state (demo only)">
+        <button onclick="setState('active', 11*86400 + 23*3600 + 47*60 + 12)" class="on" data-state="active" aria-label="Preview ACTIVE state">ACTIVE</button>
+        <button onclick="setState('warning', 12*3600 + 14*60 + 38)" data-state="warning" aria-label="Preview WARNING under 24 hours state">WARN &lt;24h</button>
+        <button onclick="setState('critical', 47)" data-state="critical" aria-label="Preview CRITICAL under 1 minute state">CRIT &lt;1m</button>
+        <button onclick="setState('expired', 0)" data-state="expired" aria-label="Preview EXPIRED state">EXPIRED</button>
       </div>
     </header>
 
@@ -788,15 +845,15 @@
       </div>
 
       <!-- SECONDARY ACTION ROW: deposit, update_config, reminders -->
-      <div class="secondary-row">
-        <button class="sec-btn" onclick="openModal('m-deposit')">
-          <span class="ic">＋</span><span>DEPOSIT</span>
+      <div class="secondary-row" role="group" aria-label="Vault actions">
+        <button class="sec-btn" onclick="openModal('m-deposit')" aria-label="Deposit more SOL to vault">
+          <span class="ic" aria-hidden="true">＋</span><span>DEPOSIT</span>
         </button>
-        <button class="sec-btn" onclick="openModal('m-config')">
-          <span class="ic">⚙</span><span>EDIT CONFIG</span>
+        <button class="sec-btn" onclick="openModal('m-config')" aria-label="Edit vault config — change beneficiary or interval">
+          <span class="ic" aria-hidden="true">⚙</span><span>EDIT CONFIG</span>
         </button>
-        <button class="sec-btn" onclick="openModal('m-reminders')">
-          <span class="ic">◔</span><span>REMINDERS</span>
+        <button class="sec-btn" onclick="openModal('m-reminders')" aria-label="Manage off-chain reminder settings">
+          <span class="ic" aria-hidden="true">◔</span><span>REMINDERS</span>
         </button>
       </div>
 
@@ -813,12 +870,12 @@
     <!-- ===== MODALS ===== -->
 
     <!-- DEPOSIT (calls program: deposit) -->
-    <div class="modal-overlay hidden" id="m-deposit" onclick="if(event.target===this) closeModal('m-deposit')">
+    <div class="modal-overlay hidden" id="m-deposit" role="dialog" aria-modal="true" aria-labelledby="m-deposit-title" onclick="if(event.target===this) closeModal('m-deposit')">
       <div class="modal">
         <span class="corner-tr"></span><span class="corner-bl"></span>
         <div class="modal-header">
           <div class="modal-tag"><span style="color:var(--green)">▸</span> ix · deposit()</div>
-          <h3 class="modal-title"><span class="pf">&gt;</span> ADD MORE SOL</h3>
+          <h3 class="modal-title" id="m-deposit-title"><span class="pf">&gt;</span> ADD MORE SOL</h3>
           <p class="modal-sub">
             the vault PDA can hold any amount. top it up any time — your interval and last_checkin are unaffected.
           </p>
@@ -847,12 +904,12 @@
     </div>
 
     <!-- EDIT CONFIG (calls program: update_config) -->
-    <div class="modal-overlay hidden" id="m-config" onclick="if(event.target===this) closeModal('m-config')">
+    <div class="modal-overlay hidden" id="m-config" role="dialog" aria-modal="true" aria-labelledby="m-config-title" onclick="if(event.target===this) closeModal('m-config')">
       <div class="modal">
         <span class="corner-tr"></span><span class="corner-bl"></span>
         <div class="modal-header">
           <div class="modal-tag"><span style="color:var(--green)">▸</span> ix · update_config()</div>
-          <h3 class="modal-title"><span class="pf">&gt;</span> EDIT VAULT CONFIG</h3>
+          <h3 class="modal-title" id="m-config-title"><span class="pf">&gt;</span> EDIT VAULT CONFIG</h3>
           <p class="modal-sub">
             change the beneficiary, interval, or both. leave a field blank to keep the current value.
             last_checkin and amount are untouched.
@@ -881,12 +938,12 @@
     </div>
 
     <!-- REMINDERS (off-chain Supabase subscribe) -->
-    <div class="modal-overlay hidden" id="m-reminders" onclick="if(event.target===this) closeModal('m-reminders')">
+    <div class="modal-overlay hidden" id="m-reminders" role="dialog" aria-modal="true" aria-labelledby="m-reminders-title" onclick="if(event.target===this) closeModal('m-reminders')">
       <div class="modal" style="max-width: 620px">
         <span class="corner-tr"></span><span class="corner-bl"></span>
         <div class="modal-header">
           <div class="modal-tag"><span style="color:var(--green)">▸</span> POST · /functions/v1/subscribe</div>
-          <h3 class="modal-title"><span class="pf">&gt;</span> REMINDER SETTINGS</h3>
+          <h3 class="modal-title" id="m-reminders-title"><span class="pf">&gt;</span> REMINDER SETTINGS</h3>
           <p class="modal-sub">
             off-chain · advisory only · status:
             <span id="rem-modal-status" class="amber">DISABLED</span>
@@ -946,12 +1003,12 @@
     </div>
 
     <!-- CANCEL VAULT (calls program: cancel) -->
-    <div class="modal-overlay hidden" id="m-cancel" onclick="if(event.target===this) closeModal('m-cancel')">
+    <div class="modal-overlay hidden" id="m-cancel" role="alertdialog" aria-modal="true" aria-labelledby="m-cancel-title" onclick="if(event.target===this) closeModal('m-cancel')">
       <div class="modal danger">
         <span class="corner-tr"></span><span class="corner-bl"></span>
         <div class="modal-header">
           <div class="modal-tag" style="color: var(--red)"><span>!</span> ix · cancel()</div>
-          <h3 class="modal-title"><span class="pf">!</span> CANCEL VAULT</h3>
+          <h3 class="modal-title" id="m-cancel-title"><span class="pf">!</span> CANCEL VAULT</h3>
           <p class="modal-sub">
             this closes the switch PDA and returns
             <span class="text-[var(--text)] font-semibold">5.00 SOL</span>
@@ -977,6 +1034,12 @@
     <script>
       // Read params from screen-3
       const params = new URLSearchParams(window.location.search);
+
+      // === DEMO MODE === — shows the state-preview toggle when ?demo=1 is set.
+      // Hidden by default so a real demo can't accidentally surface it on stage.
+      if (params.get("demo") === "1") {
+        document.body.classList.add("demo-mode");
+      }
       if (params.has("ben"))
         document.getElementById("vault-ben").textContent =
           (params.get("ben") || "").slice(0, 4) + "..." +

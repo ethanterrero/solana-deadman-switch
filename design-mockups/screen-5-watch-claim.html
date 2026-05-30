@@ -24,7 +24,8 @@
         --amber: #ffb020;
         --red: #ff3355;
         --text: #e8e8e8;
-        --muted: #6a6a6a;
+        --muted: #9a9a9a;      /* WCAG AA: 5.5:1 on #000 */
+        --muted-deep: #6a6a6a; /* old --muted, decorative only */
 
         /* state-driven (set by body.state-*) */
         --status: var(--violet);
@@ -578,6 +579,59 @@
       }
       .race-warning .ic { color: var(--red); font-size: 0.95rem; line-height: 1.5; }
       .race-warning strong { color: var(--red); }
+
+      /* === ACCESSIBILITY === */
+      :focus { outline: none; }
+      :focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
+      }
+      .btn:focus-visible,
+      .hero-claim:focus-visible,
+      .back-link:focus-visible,
+      .footer-link:focus-visible,
+      .state-toggle button:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.18);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+        .blink, .heartbeat, .flash-white, .cd-digit.tick {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+          filter: none !important;
+        }
+        body.state-claimable .amount-value,
+        body.state-claimable .hero-claim,
+        .claimed-mark {
+          animation: none !important;
+        }
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* Touch target floor */
+      .btn, .hero-claim { min-height: 44px; }
+      .footer-link { min-height: 36px; display: inline-flex; align-items: center; }
+
+      /* === DEMO MODE === */
+      .demo-only { display: none !important; }
+      body.demo-mode .demo-only { display: flex !important; }
     </style>
   </head>
   <body class="grid-bg state-empty">
@@ -602,13 +656,13 @@
         </div>
       </div>
 
-      <!-- mockup-only state preview -->
-      <div class="state-toggle">
-        <button onclick="setState('empty')" data-state="empty" class="on">EMPTY</button>
-        <button onclick="setState('watching')" data-state="watching">WATCHING</button>
-        <button onclick="setState('nearing')" data-state="nearing">NEARING &lt;1m</button>
-        <button onclick="setState('claimable')" data-state="claimable">CLAIMABLE</button>
-        <button onclick="setState('claimed')" data-state="claimed">CLAIMED</button>
+      <!-- mockup-only state preview (hidden unless ?demo=1) -->
+      <div class="state-toggle demo-only" role="group" aria-label="Preview state (demo only)">
+        <button onclick="setState('empty')" data-state="empty" class="on" aria-label="Preview EMPTY state">EMPTY</button>
+        <button onclick="setState('watching')" data-state="watching" aria-label="Preview WATCHING state">WATCHING</button>
+        <button onclick="setState('nearing')" data-state="nearing" aria-label="Preview NEARING zero state">NEARING &lt;1m</button>
+        <button onclick="setState('claimable')" data-state="claimable" aria-label="Preview CLAIMABLE state">CLAIMABLE</button>
+        <button onclick="setState('claimed')" data-state="claimed" aria-label="Preview CLAIMED state">CLAIMED</button>
       </div>
     </header>
 
@@ -815,6 +869,11 @@
     </section>
 
     <script>
+      // === DEMO MODE === — shows the state-preview toggle when ?demo=1 is set
+      if (new URLSearchParams(window.location.search).get("demo") === "1") {
+        document.body.classList.add("demo-mode");
+      }
+
       // === STATE MACHINE ===
       let currentState = "empty";
       let ticker = null;
