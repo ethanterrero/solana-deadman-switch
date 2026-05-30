@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Screen 4 — Live Cockpit · Dead Man's Switch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #000000;
+        --panel: #0a0a0a;
+        --panel-2: #0f0f0f;
+        --border: #1f1f1f;
+        --green: #00ff88;
+        --green-dim: #00aa5a;
+        --amber: #ffb020;
+        --amber-dim: #b87a14;
+        --orange: #ff7a18;
+        --red: #ff3355;
+        --red-deep: #cc1f3f;
+        --text: #e8e8e8;
+        --muted: #6a6a6a;
+
+        /* state-driven (set by body.state-*) */
+        --status: var(--amber);
+        --status-deep: var(--amber-dim);
+        --status-glow: rgba(255, 176, 32, 0.5);
+        --tick-speed: 2200ms;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.025) 0,
+          rgba(255, 255, 255, 0.025) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        pointer-events: none;
+        z-index: 100;
+        mix-blend-mode: overlay;
+      }
+      .grid-bg {
+        background-image: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          );
+        background-size: 40px 40px;
+      }
+      /* radial vignette that intensifies under critical state */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 70% 50% at center,
+          transparent 0%,
+          transparent 60%,
+          var(--status-glow) 110%
+        );
+        z-index: 50;
+        opacity: 0.18;
+        transition: all 600ms;
+      }
+      body.state-critical::after, body.state-expired::after {
+        opacity: 0.5;
+      }
+
+      /* === STATE PALETTES === */
+      body.state-active { --status: var(--amber); --status-deep: var(--amber-dim); --status-glow: rgba(255,176,32,.45); --tick-speed: 2200ms; }
+      body.state-warning { --status: var(--orange); --status-deep: #cc5f10; --status-glow: rgba(255,122,24,.5); --tick-speed: 1400ms; }
+      body.state-critical { --status: var(--red); --status-deep: var(--red-deep); --status-glow: rgba(255,51,85,.6); --tick-speed: 800ms; }
+      body.state-expired { --status: var(--red); --status-deep: var(--red-deep); --status-glow: rgba(255,51,85,.7); --tick-speed: 500ms; }
+
+      /* === ATOMS === */
+      .stamp {
+        font-size: 0.65rem;
+        letter-spacing: 0.32em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .glow-status { text-shadow: 0 0 14px var(--status-glow), 0 0 32px var(--status-glow); }
+      .glow-green { text-shadow: 0 0 12px rgba(0,255,136,.7), 0 0 32px rgba(0,255,136,.35); }
+      .blink { animation: blink 1.2s steps(2, jump-none) infinite; }
+      @keyframes blink { 50% { opacity: 0.18; } }
+
+      /* heartbeat — vault is "alive" */
+      .heartbeat {
+        width: 8px; height: 8px; border-radius: 999px;
+        background: var(--status);
+        box-shadow: 0 0 10px var(--status);
+        animation: heartbeat var(--tick-speed) ease-in-out infinite;
+      }
+      @keyframes heartbeat {
+        0%, 60%, 100% { transform: scale(1); opacity: 1; }
+        20% { transform: scale(1.5); opacity: 0.7; }
+        30% { transform: scale(1); opacity: 1; }
+        45% { transform: scale(1.3); opacity: 0.85; }
+      }
+
+      .wallet-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.55rem 0.9rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+      }
+      .dot-green {
+        width: 6px; height: 6px; border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+
+      .back-link {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.7rem;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        padding: 0.55rem 0.9rem;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        transition: all 200ms;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        cursor: pointer;
+      }
+      .back-link:hover { color: var(--text); border-color: var(--green); }
+
+      .corner {
+        position: absolute;
+        width: 18px; height: 18px;
+        border-color: var(--status);
+        opacity: 0.5;
+        transition: all 400ms;
+      }
+      .corner.tl { top: 20px; left: 20px; border-top: 1px solid; border-left: 1px solid; }
+      .corner.tr { top: 20px; right: 20px; border-top: 1px solid; border-right: 1px solid; }
+      .corner.bl { bottom: 20px; left: 20px; border-bottom: 1px solid; border-left: 1px solid; }
+      .corner.br { bottom: 20px; right: 20px; border-bottom: 1px solid; border-right: 1px solid; }
+      body.state-critical .corner, body.state-expired .corner {
+        opacity: 0.85;
+        width: 24px; height: 24px;
+        animation: cornerPulse var(--tick-speed) ease-in-out infinite;
+      }
+      @keyframes cornerPulse {
+        50% { box-shadow: 0 0 24px var(--status); }
+      }
+
+      /* === STATUS RIBBON (top) === */
+      .ribbon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        padding: 0.8rem 1.5rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        font-size: 0.75rem;
+        letter-spacing: 0.12em;
+      }
+      .ribbon-divider { color: var(--muted); }
+      .ribbon-label { color: var(--muted); margin-right: 0.4rem; font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase; }
+      .ribbon-arrow { color: var(--status); }
+
+      /* === STATUS BADGE === */
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.6rem 1.2rem;
+        border: 1px solid var(--status);
+        color: var(--status);
+        font-weight: 700;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        background: rgba(0,0,0,.6);
+      }
+      body.state-active .status-badge { box-shadow: 0 0 24px rgba(255,176,32,.2); }
+      body.state-warning .status-badge { box-shadow: 0 0 32px rgba(255,122,24,.3); }
+      body.state-critical .status-badge {
+        box-shadow: 0 0 40px rgba(255,51,85,.4);
+        animation: badgePulse 1s ease-in-out infinite;
+      }
+      body.state-expired .status-badge {
+        box-shadow: 0 0 60px rgba(255,51,85,.55);
+        animation: badgePulse .6s ease-in-out infinite;
+      }
+      @keyframes badgePulse {
+        50% { transform: scale(1.04); }
+      }
+
+      /* === COUNTDOWN (the centerpiece) === */
+      .countdown {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 0.4rem;
+      }
+      .cd-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 1.5em;
+      }
+      .cd-digit {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 900;
+        font-size: clamp(4.5rem, 17vw, 16rem);
+        line-height: 0.85;
+        color: var(--status);
+        text-shadow: 0 0 24px var(--status-glow), 0 0 64px var(--status-glow);
+        letter-spacing: -0.05em;
+        font-variant-numeric: tabular-nums;
+        transition: text-shadow 200ms;
+      }
+      .cd-digit.tick {
+        animation: tickFlash 350ms cubic-bezier(.2,.8,.2,1);
+      }
+      @keyframes tickFlash {
+        0% { transform: scale(1.06); text-shadow: 0 0 40px var(--status), 0 0 96px var(--status); filter: brightness(1.6); }
+        100% { transform: scale(1); }
+      }
+      .cd-sep {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 900;
+        font-size: clamp(3rem, 12vw, 11rem);
+        line-height: 0.85;
+        color: var(--status);
+        opacity: 0.4;
+        padding-top: 0.3em;
+      }
+      .cd-label {
+        font-size: 0.7rem;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-top: 0.8rem;
+      }
+
+      .unlocks-at {
+        text-align: center;
+        margin-top: 1.5rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+        letter-spacing: 0.06em;
+      }
+      .unlocks-at .ts {
+        color: var(--status);
+        font-weight: 600;
+      }
+
+      /* === HERO CHECK_IN BUTTON === */
+      .hero-cta {
+        position: relative;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        padding: 2rem 4.5rem;
+        background: transparent;
+        border: 2px solid var(--green);
+        color: var(--green);
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        cursor: pointer;
+        font-size: 1.4rem;
+        transition: all 280ms cubic-bezier(.2,.8,.2,1);
+        text-decoration: none;
+        min-width: 380px;
+        animation: ctaBreath 3.6s ease-in-out infinite;
+      }
+      @keyframes ctaBreath {
+        0%, 100% { box-shadow: 0 0 30px rgba(0,255,136,.25), inset 0 0 24px rgba(0,255,136,.04); }
+        50% { box-shadow: 0 0 60px rgba(0,255,136,.45), inset 0 0 40px rgba(0,255,136,.08); }
+      }
+      .hero-cta::before, .hero-cta::after {
+        content: "";
+        position: absolute;
+        width: 14px; height: 14px;
+        border: 2px solid var(--green);
+      }
+      .hero-cta::before { top: -10px; left: -10px; border-right: 0; border-bottom: 0; }
+      .hero-cta::after { bottom: -10px; right: -10px; border-left: 0; border-top: 0; }
+      .hero-cta:hover {
+        background: var(--green);
+        color: #000;
+        box-shadow: 0 0 90px rgba(0,255,136,.6), inset 0 0 32px rgba(255,255,255,.18);
+        animation: none;
+        letter-spacing: 0.26em;
+      }
+      .hero-cta .sub {
+        font-size: 0.7rem;
+        letter-spacing: 0.25em;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      .hero-cta:hover .sub { color: #003319; }
+
+      .last-checkin {
+        text-align: center;
+        margin-top: 1.5rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+      }
+      .last-checkin .ago {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      /* === FOOTER === */
+      .footer {
+        margin-top: 4rem;
+        padding: 1.2rem 0;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .footer-link {
+        font-size: 0.7rem;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-decoration: none;
+        cursor: pointer;
+        transition: color 200ms;
+        padding: 0.45rem 0.8rem;
+        border: 1px solid transparent;
+      }
+      .footer-link:hover { color: var(--text); border-color: var(--border); }
+      .footer-link.danger:hover { color: var(--red); border-color: var(--red); }
+
+      /* === EXPIRED warning banner === */
+      .expired-banner {
+        display: none;
+        background: rgba(255,51,85,.12);
+        border: 1px solid var(--red);
+        padding: 1.2rem 1.5rem;
+        margin-bottom: 1.5rem;
+        animation: expiredIn 400ms cubic-bezier(.2,.8,.2,1);
+      }
+      @keyframes expiredIn {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      body.state-expired .expired-banner { display: block; }
+
+      /* === STATE TOGGLE (mockup only) === */
+      .state-toggle {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+      }
+      .state-toggle button {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.65rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        padding: 0.45rem 0.7rem;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        transition: all 180ms;
+      }
+      .state-toggle button:hover { color: var(--text); }
+      .state-toggle button.on {
+        background: var(--panel-2);
+        border-color: var(--status);
+        color: var(--status);
+        box-shadow: 0 0 12px var(--status-glow);
+      }
+
+      /* CTA hides in expired state (technically still possible to check in, but de-emphasized) */
+      body.state-expired .hero-cta {
+        border-color: var(--muted);
+        color: var(--muted);
+        animation: none;
+      }
+      body.state-expired .hero-cta::before, body.state-expired .hero-cta::after {
+        border-color: var(--muted);
+      }
+    </style>
+  </head>
+  <body class="grid-bg state-active">
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+
+    <!-- TOPBAR -->
+    <header class="px-10 py-6 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <a href="screen-2-identify.html" class="back-link">
+          <span>◀</span><span>EXIT</span>
+        </a>
+        <div class="wallet-pill">
+          <span class="dot-green"></span>
+          <span class="stamp" style="color:var(--text)">OWNER</span>
+          <span class="text-xs text-[var(--muted)]">·</span>
+          <span class="text-xs">7xK4...3pQ2</span>
+          <span class="text-xs text-[var(--muted)]">·</span>
+          <span class="text-xs text-[var(--green)] glow-green">12.40 SOL</span>
+        </div>
+      </div>
+
+      <!-- MOCKUP-ONLY: state preview toggle -->
+      <div class="state-toggle">
+        <button onclick="setState('active', 11*86400 + 23*3600 + 47*60 + 12)" class="on" data-state="active">ACTIVE</button>
+        <button onclick="setState('warning', 12*3600 + 14*60 + 38)" data-state="warning">WARN &lt;24h</button>
+        <button onclick="setState('critical', 47)" data-state="critical">CRIT &lt;1m</button>
+        <button onclick="setState('expired', 0)" data-state="expired">EXPIRED</button>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="max-w-5xl mx-auto px-6 py-2">
+      <!-- vault info ribbon -->
+      <div class="ribbon mb-10">
+        <span><span class="ribbon-label">VAULT</span><span class="text-[var(--text)]" id="vault-pda">8Hk9...vC3</span></span>
+        <span class="ribbon-divider">·</span>
+        <span><span class="ribbon-label">LOCKED</span><span class="text-[var(--status)] glow-status font-bold" id="vault-amount">5.00 SOL</span></span>
+        <span class="ribbon-arrow">▶</span>
+        <span><span class="ribbon-label">→ HEIR</span><span class="text-[var(--text)]" id="vault-ben">9mNx...wYz4</span></span>
+        <span class="ribbon-divider">·</span>
+        <span><span class="ribbon-label">INTERVAL</span><span class="text-[var(--text)]" id="vault-int">30 DAYS</span></span>
+      </div>
+
+      <!-- expired warning banner -->
+      <div class="expired-banner">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="text-[var(--red)] text-lg">⚠</span>
+          <span class="stamp text-[var(--red)] glow-status">BENEFICIARY CAN CLAIM NOW</span>
+        </div>
+        <p class="text-sm text-[var(--text)] mt-2 leading-relaxed">
+          your interval elapsed. the wallet <span class="text-[var(--red)] font-semibold">9mNx...wYz4</span>
+          can now broadcast a claim() tx and take the funds. you can still check in to reset the timer —
+          <span class="font-semibold">but you're in a race.</span>
+        </p>
+      </div>
+
+      <!-- status badge (centered above countdown) -->
+      <div class="flex items-center justify-center gap-3 mb-6">
+        <span class="heartbeat"></span>
+        <div class="status-badge">
+          <span class="text-lg" style="line-height:0">◇</span>
+          <span id="status-text">ARMED · LOCKED</span>
+        </div>
+        <span class="stamp" id="status-sub">vault is watching</span>
+      </div>
+
+      <!-- THE COUNTDOWN -->
+      <div class="stamp text-center mb-3" id="cd-prelabel">UNLOCKS IN</div>
+      <div class="countdown" id="countdown">
+        <div class="cd-cell">
+          <div class="cd-digit" id="cd-d">11</div>
+          <div class="cd-label">DAYS</div>
+        </div>
+        <div class="cd-sep">:</div>
+        <div class="cd-cell">
+          <div class="cd-digit" id="cd-h">23</div>
+          <div class="cd-label">HRS</div>
+        </div>
+        <div class="cd-sep">:</div>
+        <div class="cd-cell">
+          <div class="cd-digit" id="cd-m">47</div>
+          <div class="cd-label">MIN</div>
+        </div>
+        <div class="cd-sep">:</div>
+        <div class="cd-cell">
+          <div class="cd-digit" id="cd-s">12</div>
+          <div class="cd-label">SEC</div>
+        </div>
+      </div>
+
+      <div class="unlocks-at">
+        next deadline · <span class="ts" id="deadline">Jun 10, 2026 · 14:23 UTC</span>
+      </div>
+
+      <!-- HERO CHECK_IN -->
+      <div class="flex justify-center mt-12">
+        <button id="check-in" class="hero-cta">
+          <span>◆ CHECK IN</span>
+          <span class="sub">reset the timer · 1 tx</span>
+        </button>
+      </div>
+
+      <div class="last-checkin">
+        last check-in · <span class="ago">18 days ago</span> · May 11, 2026 · 14:23 UTC
+        <span class="text-[var(--muted)]">·</span>
+        <span class="text-[var(--green-dim)] text-xs">tx 4Hk9...8nQ</span>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="footer">
+        <a class="footer-link danger" onclick="openCancel()">◀ CANCEL VAULT · returns 5.00 SOL to your wallet</a>
+        <div class="flex gap-2">
+          <a class="footer-link" onclick="alert('opens Solana Explorer (mockup)')">VIEW ON SOLANA EXPLORER ▸</a>
+          <a class="footer-link" onclick="openLog()">▤ TX LOG</a>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      // Read params from screen-3
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("ben"))
+        document.getElementById("vault-ben").textContent =
+          (params.get("ben") || "").slice(0, 4) + "..." +
+          (params.get("ben") || "").slice(-4);
+      if (params.has("int"))
+        document.getElementById("vault-int").textContent = params.get("int") + " DAYS";
+      if (params.has("amt")) {
+        const a = parseFloat(params.get("amt")).toFixed(2) + " SOL";
+        document.getElementById("vault-amount").textContent = a;
+      }
+
+      // Countdown state
+      let remaining = 11 * 86400 + 23 * 3600 + 47 * 60 + 12;
+      let lastSec = -1;
+      let ticker = null;
+
+      const dEl = document.getElementById("cd-d");
+      const hEl = document.getElementById("cd-h");
+      const mEl = document.getElementById("cd-m");
+      const sEl = document.getElementById("cd-s");
+
+      function pad(n) { return n.toString().padStart(2, "0"); }
+
+      function render() {
+        const r = Math.max(0, remaining);
+        const days = Math.floor(r / 86400);
+        const hours = Math.floor((r % 86400) / 3600);
+        const mins = Math.floor((r % 3600) / 60);
+        const secs = r % 60;
+
+        dEl.textContent = pad(days);
+        hEl.textContent = pad(hours);
+        mEl.textContent = pad(mins);
+        sEl.textContent = pad(secs);
+
+        if (secs !== lastSec) {
+          sEl.classList.remove("tick");
+          // force reflow so animation restarts
+          void sEl.offsetWidth;
+          sEl.classList.add("tick");
+          lastSec = secs;
+        }
+      }
+
+      function startTicker() {
+        if (ticker) clearInterval(ticker);
+        ticker = setInterval(() => {
+          if (remaining > 0) {
+            remaining -= 1;
+            render();
+            // auto-escalate state as time runs out (mockup demo)
+            if (remaining === 0) setState("expired", 0, true);
+          }
+        }, 1000);
+      }
+
+      function setState(state, seconds, skipToggleUpdate) {
+        document.body.classList.remove("state-active", "state-warning", "state-critical", "state-expired");
+        document.body.classList.add("state-" + state);
+
+        if (typeof seconds === "number") remaining = seconds;
+
+        const statusEl = document.getElementById("status-text");
+        const statusSub = document.getElementById("status-sub");
+        const cdPre = document.getElementById("cd-prelabel");
+        const checkIn = document.getElementById("check-in");
+
+        switch (state) {
+          case "active":
+            statusEl.textContent = "ARMED · LOCKED";
+            statusSub.textContent = "vault is watching";
+            cdPre.textContent = "UNLOCKS IN";
+            checkIn.querySelector("span").textContent = "◆ CHECK IN";
+            break;
+          case "warning":
+            statusEl.textContent = "ARMED · 24H WINDOW";
+            statusSub.textContent = "check in soon";
+            cdPre.textContent = "UNLOCKS IN";
+            checkIn.querySelector("span").textContent = "◆ CHECK IN";
+            break;
+          case "critical":
+            statusEl.textContent = "CRITICAL · CHECK IN NOW";
+            statusSub.textContent = "danger zone";
+            cdPre.textContent = "UNLOCKS IN";
+            checkIn.querySelector("span").textContent = "◆ CHECK IN NOW";
+            break;
+          case "expired":
+            statusEl.textContent = "EXPIRED · BENEFICIARY CAN CLAIM";
+            statusSub.textContent = "race in progress";
+            cdPre.textContent = "OVERDUE BY";
+            checkIn.querySelector("span").textContent = "◆ ATTEMPT CHECK_IN";
+            break;
+        }
+
+        if (!skipToggleUpdate) {
+          document.querySelectorAll(".state-toggle button").forEach((b) => {
+            b.classList.toggle("on", b.dataset.state === state);
+          });
+        } else {
+          document.querySelectorAll(".state-toggle button").forEach((b) => {
+            b.classList.toggle("on", b.dataset.state === state);
+          });
+        }
+        render();
+      }
+
+      render();
+      startTicker();
+
+      // CHECK_IN handler (mockup: animate countdown reset to 30 days)
+      document.getElementById("check-in").addEventListener("click", () => {
+        // flash green flood
+        const flood = document.createElement("div");
+        flood.style.cssText = `
+          position: fixed; inset: 0;
+          background: radial-gradient(ellipse at center, rgba(0,255,136,.4), rgba(0,255,136,0) 70%);
+          z-index: 150;
+          pointer-events: none;
+          animation: floodIn 700ms ease-out;
+        `;
+        document.body.appendChild(flood);
+        setTimeout(() => flood.remove(), 700);
+
+        // tx confirmation overlay
+        const overlay = document.createElement("div");
+        overlay.style.cssText = `
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,.92);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 200; flex-direction: column; gap: 1.5rem;
+          font-family: "JetBrains Mono", monospace;
+          color: var(--green);
+        `;
+        overlay.innerHTML = `
+          <div style="font-size:.65rem; letter-spacing:.32em; color:#888">SIGNING TRANSACTION</div>
+          <div style="font-size:2rem; font-weight:800; color:#00FF88; text-shadow: 0 0 24px rgba(0,255,136,.6);">
+            CHECK_IN()<span style="animation: blink 1s steps(2) infinite">_</span>
+          </div>
+          <div style="margin-top:1rem;">
+            <div style="height:2px; width:200px; background:#1f1f1f; position:relative; overflow:hidden;">
+              <div style="height:100%; width:0%; background:#00FF88; box-shadow:0 0 12px #00FF88; animation: pgrs 1400ms ease forwards"></div>
+            </div>
+          </div>
+          <style>@keyframes pgrs { to { width: 100%; } }
+                 @keyframes floodIn { from { opacity: 1; } to { opacity: 0; } }</style>
+        `;
+        document.body.appendChild(overlay);
+        setTimeout(() => {
+          overlay.remove();
+          // reset to active state with full interval
+          setState("active", 30 * 86400);
+        }, 1500);
+      });
+
+      function openCancel() {
+        const ok = confirm(
+          "[MOCKUP]\n\nCANCEL VAULT\n\nthis will close the switch PDA and return 5.00 SOL to your wallet. you can re-arm later. proceed?"
+        );
+        if (ok) alert("[MOCKUP]\n\ncancel() tx broadcast → vault closed → 5.00 SOL returned");
+      }
+      function openLog() {
+        alert(
+          "[MOCKUP]\n\nON-CHAIN ACTIVITY:\n\n" +
+          "▸ check_in · 4Hk9...8nQ · May 11 14:23\n" +
+          "▸ check_in · 9aB2...Lm3 · Apr 11 09:01\n" +
+          "▸ initialize · 7mNq...rT5 · Mar 12 10:44"
+        );
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === " " || e.code === "Space") {
+          e.preventDefault();
+          document.getElementById("check-in").click();
+        } else if (e.key === "1") setState("active", 11 * 86400 + 23 * 3600 + 47 * 60 + 12);
+        else if (e.key === "2") setState("warning", 12 * 3600 + 14 * 60 + 38);
+        else if (e.key === "3") setState("critical", 47);
+        else if (e.key === "4") setState("expired", 0);
+      });
+    </script>
+  </body>
+</html>
