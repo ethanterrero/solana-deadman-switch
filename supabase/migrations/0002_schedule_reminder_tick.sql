@@ -1,7 +1,7 @@
 -- Schedules the reminder-tick edge function to run every minute via pg_cron.
 --
--- This was applied to the live project (deadman-switch-reminders /
--- evwzkclqfjypefxglylc) already. It is committed for reproducibility — if you
+-- This was applied to the live project (personal org "deadman-switch" /
+-- hoxktihicnmnsibovvei) already. It is committed for reproducibility — if you
 -- ever rebuild the project, set the Vault secret then run this.
 --
 -- The shared secret lives in Vault (not inline in cron.job, so it is not stored
@@ -20,7 +20,7 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_post(
-    url := 'https://evwzkclqfjypefxglylc.supabase.co/functions/v1/reminder-tick',
+    url := 'https://hoxktihicnmnsibovvei.supabase.co/functions/v1/reminder-tick',
     headers := jsonb_build_object(
       'content-type', 'application/json',
       'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'reminder_cron_secret')
