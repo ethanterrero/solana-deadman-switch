@@ -9,14 +9,14 @@
 
 ## Status
 
-- [x] Phase 0 — Setup (toolchain, wallets generated; devnet airdrop pending — faucet rate-limited)
-- [x] Phase 1 — Program (initialize, check_in, claim, cancel) — builds, IDL frozen
-- [x] Phase 2 — Anchor tests — `anchor test` green (5 passing)
+- [x] Phase 0 — Setup (toolchain, wallets funded)
+- [x] Phase 1 — Program (initialize, check_in, deposit, update_config, claim, cancel) — **deployed to devnet**, IDL frozen
+- [x] Phase 2 — Anchor tests — `anchor test` green (11 passing)
 - [ ] Phase 3 — Frontend
 - [ ] Phase 4 — Demo prep
 - [ ] Phase 5 — Submission
 
-**Devnet program ID:** `6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu` (pinned in `declare_id!` + `Anchor.toml`; `anchor deploy` pending owner-wallet funding)
+**Devnet program ID:** `6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu` — live on devnet (upgradeable; upgrade authority = owner wallet). On-chain IDL available via `anchor idl fetch`.
 
 ---
 
