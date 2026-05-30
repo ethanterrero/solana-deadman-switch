@@ -21,8 +21,8 @@ Frontend ──▶ Edge Function: subscribe
                └─ upserts into reminder_subscriptions (RLS-locked, service-role only)
 ```
 
-- **Project:** `deadman-switch-reminders` (`evwzkclqfjypefxglylc`)
-- **Base URL:** `https://evwzkclqfjypefxglylc.supabase.co`
+- **Project:** `ethanterrero's Project` — personal org `deadman-switch` (`hoxktihicnmnsibovvei`)
+- **Base URL:** `https://hoxktihicnmnsibovvei.supabase.co`
 - **Table:** `public.reminder_subscriptions` (RLS enabled, deny-all to anon/auth; only the service-role key in the functions can read/write it — emails are PII)
 - **Program watched:** `6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu` (devnet)
 
@@ -39,7 +39,7 @@ select decrypted_secret from vault.decrypted_secrets where name = 'reminder_cron
 Then set the function secrets (substitute `<CRON_SECRET>` with that value):
 
 ```bash
-supabase secrets set --project-ref evwzkclqfjypefxglylc \
+supabase secrets set --project-ref hoxktihicnmnsibovvei \
   CRON_SECRET=<CRON_SECRET> \
   RESEND_API_KEY=re_xxxxxxxx \
   "RESEND_FROM=Dead Man's Switch <reminders@yourdomain.com>" \
@@ -74,10 +74,10 @@ automatically on the next tick.
 
 ```bash
 # Auth gate (no secret → 401):
-curl -i -X POST https://evwzkclqfjypefxglylc.supabase.co/functions/v1/reminder-tick
+curl -i -X POST https://hoxktihicnmnsibovvei.supabase.co/functions/v1/reminder-tick
 
 # Manual tick (after setting CRON_SECRET on the function):
-curl -s -X POST https://evwzkclqfjypefxglylc.supabase.co/functions/v1/reminder-tick \
+curl -s -X POST https://hoxktihicnmnsibovvei.supabase.co/functions/v1/reminder-tick \
   -H "x-cron-secret: $CRON_SECRET" | jq
 # → {"ok":true,"checked":N,"notified":M,"disabled":K,"errors":[]}
 ```
@@ -90,7 +90,7 @@ select status, return_message, start_time from cron.job_run_details order by sta
 
 ## subscribe — frontend contract
 
-`POST https://evwzkclqfjypefxglylc.supabase.co/functions/v1/subscribe`
+`POST https://hoxktihicnmnsibovvei.supabase.co/functions/v1/subscribe`
 `Content-Type: application/json` (CORS open; no auth header needed — gated by the
 on-chain ownership check)
 

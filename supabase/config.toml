@@ -2,7 +2,7 @@
 # Functions are deployed via MCP/dashboard; this exists for local-CLI parity
 # (`supabase functions serve`) and to pin verify_jwt to match production.
 
-project_id = "evwzkclqfjypefxglylc"
+project_id = "hoxktihicnmnsibovvei"
 
 # reminder-tick is gated by the x-cron-secret header, not a JWT.
 [functions.reminder-tick]
