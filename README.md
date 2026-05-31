@@ -12,11 +12,35 @@
 - [x] Phase 0 — Setup (toolchain, wallets funded)
 - [x] Phase 1 — Program (initialize, check_in, deposit, update_config, claim, cancel) — **deployed to devnet**, IDL frozen
 - [x] Phase 2 — Anchor tests — `anchor test` green (11 passing)
-- [ ] Phase 3 — Frontend
+- [~] Phase 3 — Frontend — **UI complete, on-chain wiring in progress** (see below)
 - [ ] Phase 4 — Demo prep
 - [ ] Phase 5 — Submission
 
 **Devnet program ID:** `6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu` — live on devnet (upgradeable; upgrade authority = owner wallet). On-chain IDL available via `anchor idl fetch`.
+
+### Phase 3 detail
+
+The frontend (`app/`) is a Vite + React + TS app in a single visual language —
+**"Terminal Vault"** (black / neon-green, JetBrains Mono, CRT scanlines). It's a
+five-screen *cinematic wizard*, not a single control panel:
+
+| Route | Screen | Status |
+|---|---|---|
+| `/` | Cold open — manifesto + INITIATE | ✅ built |
+| `/identify` | Role select — OWNER vs BENEFICIARY | ✅ built |
+| `/arm` | Owner wizard — beneficiary → interval → amount → oath → reminders | ✅ UI · ⏳ tx mocked |
+| `/cockpit` | Owner cockpit — live countdown, CHECK_IN, deposit/edit/reminders/cancel | ✅ UI · ⏳ tx mocked |
+| `/watch` | Beneficiary — watch the countdown, claim at zero | ✅ UI · ⏳ tx mocked |
+
+- ✅ **Wired:** wallet-adapter (Phantom + Solflare, devnet), live balance, drift-free
+  `Date.now()`-based countdown, routing, accessibility (focus rings, reduced-motion,
+  WCAG-AA contrast, modal focus-trap), `?demo=1` state-preview flag.
+- ⏳ **Mocked (next):** the six program instructions, the Supabase `subscribe` POST,
+  and the event-driven activity feed are stubbed with `// TODO` markers and a fake
+  tx overlay. The full visual lifecycle runs; no transaction is broadcast yet.
+
+**Done when:** full lifecycle runnable from the browser on devnet — i.e. the `// TODO`
+markers are replaced with real `program.methods.*().rpc()` calls. See `app/README.md`.
 
 ---
 
@@ -26,7 +50,10 @@
 deadman-switch/
 ├── programs/deadman-switch/   # Anchor program (Device A)
 ├── tests/                     # Anchor tests in TS (Device A)
-├── app/                       # Vite + React frontend (Device B)
+├── scripts/smoke-devnet.ts    # Full-lifecycle smoke test against live devnet
+├── app/                       # Vite + React frontend (Device B) — see app/README.md
+├── design-mockups/            # Static HTML mockups (design history; superseded by app/)
+├── supabase/                  # Off-chain reminder notifier (Postgres + 2 Edge Functions)
 ├── target/idl/                # Generated IDL — committed so Device B can consume
 ├── PLAN.md                    # Full build plan, phase by phase
 ├── DEVICE_SPLIT.md            # Two-device work split + handoffs
@@ -58,12 +85,20 @@ cd programs/deadman-switch && anchor build && anchor deploy
 
 ### Run locally
 ```bash
-# Device A
+# Device A — program tests
 anchor test
 
-# Device B
-cd app && npm install && npm run dev
+# Device A — full lifecycle against live devnet
+npx ts-node scripts/smoke-devnet.ts
+
+# Device B — frontend dev server
+cd app && npm install && npm run dev   # http://localhost:5173
 ```
+
+**Walk the demo flow:** open `/` → INITIATE → pick OWNER → step through the wizard →
+land in the cockpit. Or pick BENEFICIARY → load an owner address → watch the countdown
+→ CLAIM at zero. Append `?demo=1` to `/cockpit` or `/watch` to reveal the hidden
+state-preview toggle (lets you jump straight to CLAIMABLE/EXPIRED for rehearsal).
 
 ---
 
