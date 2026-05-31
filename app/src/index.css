@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === TERMINAL VAULT — design tokens === */
+:root {
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --panel-2: #0f0f0f;
+  --border: #1f1f1f;
+  --green: #00ff88;
+  --green-dim: #00aa5a;
+  --amber: #ffb020;
+  --amber-dim: #b87a14;
+  --orange: #ff7a18;
+  --red: #ff3355;
+  --red-deep: #cc1f3f;
+  --violet: #a78bfa;
+  --violet-deep: #7c3aed;
+  --text: #e8e8e8;
+  --muted: #9a9a9a;
+  --muted-deep: #6a6a6a;
+
+  /* state-driven (set by body.state-*) */
+  --status: var(--amber);
+  --status-glow: rgba(255, 176, 32, 0.5);
+  --tick-speed: 2200ms;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+body { overflow-x: hidden; }
+
+/* CRT scanlines */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.025) 0,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 100;
+  mix-blend-mode: overlay;
+}
+
+/* Subtle grid */
+.grid-bg {
+  background-image: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px
+    );
+  background-size: 40px 40px;
+}
+
+/* === STATE PALETTES === */
+body.state-active   { --status: var(--amber);  --status-glow: rgba(255,176,32,.45);   --tick-speed: 2200ms; }
+body.state-warning  { --status: var(--orange); --status-glow: rgba(255,122,24,.5);    --tick-speed: 1400ms; }
+body.state-critical { --status: var(--red);    --status-glow: rgba(255,51,85,.6);     --tick-speed: 800ms;  }
+body.state-expired  { --status: var(--red);    --status-glow: rgba(255,51,85,.7);     --tick-speed: 500ms;  }
+body.state-empty    { --status: var(--green);  --status-glow: rgba(0,255,136,.35);    }
+body.state-watching { --status: var(--violet); --status-glow: rgba(167,139,250,.45);  --tick-speed: 2400ms; }
+body.state-nearing  { --status: var(--violet); --status-glow: rgba(167,139,250,.6);   --tick-speed: 1200ms; }
+body.state-claimable { --status: var(--green);  --status-glow: rgba(0,255,136,.6);     --tick-speed: 800ms; }
+body.state-claimed  { --status: var(--green-dim); --status-glow: rgba(0,170,90,.35); }
+
+/* Vignette on intense states */
+body.state-critical::after, body.state-expired::after, body.state-claimable::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 50% at center,
+    transparent 0%,
+    transparent 60%,
+    var(--status-glow) 110%
+  );
+  z-index: 50;
+  opacity: 0.5;
+}
+
+/* === SHARED PRIMITIVES === */
+.stamp {
+  font-size: 0.65rem;
+  letter-spacing: 0.32em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.glow-status { text-shadow: 0 0 14px var(--status-glow), 0 0 32px var(--status-glow); }
+.glow-green  { text-shadow: 0 0 12px rgba(0,255,136,.7), 0 0 32px rgba(0,255,136,.35); }
+.glow-amber  { text-shadow: 0 0 12px rgba(255,176,32,.7), 0 0 32px rgba(255,176,32,.35); }
+.glow-red    { text-shadow: 0 0 12px rgba(255,51,85,.8),  0 0 32px rgba(255,51,85,.4); }
+.glow-violet { text-shadow: 0 0 12px rgba(167,139,250,.7), 0 0 32px rgba(167,139,250,.35); }
+
+.blink { animation: blink 1.2s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: 0.18; } }
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* === FOCUS RINGS (accessibility) === */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.18);
+}
+
+/* === REDUCED MOTION === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* === SCREEN READER ONLY === */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* === COUNTDOWN === */
+.cd-digit {
+  font-weight: 900;
+  font-size: clamp(4.5rem, 17vw, 16rem);
+  line-height: 0.85;
+  color: var(--status);
+  text-shadow: 0 0 24px var(--status-glow), 0 0 64px var(--status-glow);
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  transition: text-shadow 200ms;
+}
+.cd-digit.tick {
+  animation: tickFlash 350ms cubic-bezier(.2,.8,.2,1);
+}
+@keyframes tickFlash {
+  0% {
+    transform: scale(1.06);
+    text-shadow: 0 0 40px var(--status), 0 0 96px var(--status);
+    filter: brightness(1.6);
+  }
+  100% { transform: scale(1); }
+}
+.cd-sep {
+  font-weight: 900;
+  font-size: clamp(3rem, 12vw, 11rem);
+  line-height: 0.85;
+  color: var(--status);
+  opacity: 0.4;
+  padding-top: 0.3em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cd-digit.tick { animation: none !important; transform: none !important; filter: none !important; }
+}
+
+/* === FLASH (cinematic claim transition) === */
+.flash-white {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 200;
+  pointer-events: none;
+  animation: flashWhite 800ms ease-out forwards;
+}
+@keyframes flashWhite {
+  0% { opacity: 0; }
+  15% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash-white { animation: none !important; opacity: 0 !important; }
+}
+
+/* === WALLET ADAPTER OVERRIDES === */
+/* hide built-in styles, we render our own button */
+.wallet-adapter-button {
+  background: transparent !important;
+  font-family: inherit !important;
+  height: auto !important;
+  padding: 0 !important;
+}
