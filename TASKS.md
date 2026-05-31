@@ -6,41 +6,38 @@ Tick tasks as you ship them. Owner column tells you which device picks it up.
 
 | # | Owner | Task | Blocking? |
 |---|---|---|---|
-| ~~1~~ | A | ~~Install anchor (`avm`) + verify `anchor --version`~~ ✅ | done |
-| ~~2~~ | A | ~~`solana config set --url devnet` + generate owner keypair + airdrop 2 SOL~~ ✅ | done |
-| ~~3~~ | A | ~~Generate beneficiary keypair to `~/.config/solana/beneficiary.json`~~ ✅ | done |
-| ~~4~~ | A | ~~`anchor init` overlay into this repo and confirm stock deploy~~ ✅ | done |
-| 5 | B | `npm create vite@latest app -- --template react-ts` | no |
-| 6 | B | Install `@solana/web3.js`, `@coral-xyz/anchor`, `@solana/wallet-adapter-react`, `@solana/wallet-adapter-react-ui`, `@solana/wallet-adapter-wallets` | no |
-| 7 | B | Drop in wallet adapter provider + connect button | no |
+| 16 | B | Import IDL → build typed Anchor `Program` client + `useProgram` hook | yes — gates 17–20 |
+| 17 | B | Wire `initialize` (wizard ARM IT) + fetch Switch account on cockpit load | 16 |
+| 18 | B | Wire cockpit actions: `check_in`, `deposit`, `update_config`, `cancel` | 16 |
+| 19 | B | Wire `claim` on the beneficiary screen | 16 |
+| 20 | B | Real Supabase `subscribe` POST (replace mocked overlay) | 16 |
 
-## Next (after current batch)
+## Done
 
-| # | Owner | Task | Depends on |
-|---|---|---|---|
-| ~~8~~ | A | ~~Implement `Switch` state + `initialize` + `check_in`~~ ✅ (+`deposit`, `update_config`, events) | done |
-| ~~9~~ | A | ~~Implement `claim` + `cancel` + errors~~ ✅ | done |
-| ~~10~~ | A | ~~Update `declare_id!` and `Anchor.toml` with deployed program ID, redeploy~~ ✅ | done |
-| ~~11~~ | A | ~~Commit IDL + program ID — **handoff signal to B**~~ ✅ handoff sent | done |
-| 12 | B | Hand-write `Switch` type stub matching PLAN.md state | 7 |
-| 13 | B | Build `InitForm` + `StatusPanel` + `ActionButtons` skeletons against the stub | 12 |
-| ~~14~~ | A | ~~Write happy-path Anchor test~~ ✅ | done |
-| ~~15~~ | A | ~~Write 4 failure-mode tests~~ ✅ 11 passing + devnet smoke test | done |
-| 16 | B | Pull IDL, swap stub for real Anchor `Program` client | 11, 13 |
-| 17 | B | Wire all 4 buttons end-to-end against devnet | 16 |
-| 18 | B | Implement LOCKED/CLAIMABLE badge + countdown with color flip | 17 |
+| # | Owner | Task |
+|---|---|---|
+| ~~1–4~~ | A | ~~Toolchain, devnet config, owner + beneficiary keypairs, anchor init/deploy~~ ✅ |
+| ~~5~~ | B | ~~Vite + React + TS scaffold (`app/`)~~ ✅ |
+| ~~6~~ | B | ~~Install web3.js / anchor / wallet-adapter packages~~ ✅ |
+| ~~7~~ | B | ~~Wallet adapter provider + connect button (Phantom + Solflare)~~ ✅ |
+| ~~8–9~~ | A | ~~`Switch` state, all 6 instructions, errors, events~~ ✅ |
+| ~~10–11~~ | A | ~~`declare_id!` + `Anchor.toml` + commit IDL — handoff to B~~ ✅ |
+| ~~12–13~~ | B | ~~UI built straight against the committed IDL types (no stub needed)~~ ✅ |
+| ~~14–15~~ | A | ~~Happy-path + failure-mode tests (11 passing) + devnet smoke test~~ ✅ |
+| ~~18b~~ | B | ~~LOCKED/CLAIMABLE flip + drift-free countdown (visual; tx wiring pending)~~ ✅ |
+| — | B | ~~All 5 cinematic-wizard screens, accessibility pass, `?demo=1` flag~~ ✅ |
 
 ## Demo + ship
 
 | # | Owner | Task | Depends on |
 |---|---|---|---|
-| 19 | Both | Pre-fund both wallets enough for ~5 demo runs | 11 |
-| 20 | Both | Write demo script (under 2 min) | 18 |
-| 21 | A | Record terminal-fallback video (anchor test full output) | 15 |
-| 22 | B | Record browser happy-path video | 18 |
-| 23 | Both | Rehearse live demo, time it twice | 20 |
-| 24 | B | Finalize README with devnet program ID + architecture | 11 |
-| 25 | B | Tag release + fill out submission form | 24 |
+| 21 | Both | Pre-fund both wallets enough for ~5 demo runs | 11 |
+| 22 | Both | Write demo script (under 2 min) | 17–19 |
+| 23 | A | Record terminal-fallback video (anchor test full output) | 15 |
+| 24 | B | Record browser happy-path video | 17–19 |
+| 25 | Both | Rehearse live demo, time it twice | 22 |
+| 26 | B | Finalize README with devnet program ID + architecture | 11 |
+| 27 | B | Tag release + fill out submission form | 26 |
 
 ## Cuts available if behind (in order, top first)
 - Drop `cancel` ix (and its button + test)

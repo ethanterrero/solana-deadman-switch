@@ -49,16 +49,35 @@ Source of truth for what to build, in order. Mirrors the original brief; mark ph
 ---
 
 ## Phase 3 — Frontend (~2–3 hr) — **Device B**
-- [ ] Vite + React + TS scaffold
-- [ ] `@solana/web3.js`, `@coral-xyz/anchor`, `@solana/wallet-adapter-react` + UI
-- [ ] Wallet connect, show pubkey + balance
-- [ ] Initialize form: beneficiary pubkey, interval (default 30s), amount
-- [ ] Status panel: `last_checkin`, computed `unlocks_at`, live countdown
-- [ ] LOCKED / CLAIMABLE badge — make the flip visually loud (red → green)
-- [ ] Four buttons: Initialize, Check In, Claim, Cancel
-- [ ] Both wallet contexts work (switch between owner + beneficiary)
+
+Scope grew past the original "one control panel with four buttons" — the UI is a
+five-screen **cinematic wizard** in the "Terminal Vault" style (black/neon-green,
+JetBrains Mono, scanlines). Design history lives in `design-mockups/`; the shipped
+app is in `app/`.
+
+**UI — done:**
+- [x] Vite + React + TS scaffold (`app/`)
+- [x] `@solana/web3.js`, `@coral-xyz/anchor`, `@solana/wallet-adapter-react` + UI
+- [x] Wallet connect (Phantom + Solflare), show pubkey + live balance
+- [x] Initialize flow: beneficiary pubkey, interval, amount (5-step wizard + oath)
+- [x] Status panel: `last_checkin`, computed `unlocks_at`, live countdown (drift-free, `Date.now()`-based)
+- [x] LOCKED / CLAIMABLE flip — loud amber→red→green escalation; full-screen flash on claim
+- [x] All six actions surfaced: initialize, check_in, deposit, update_config, claim, cancel
+- [x] Both roles: OWNER cockpit (`/cockpit`) + BENEFICIARY watch/claim (`/watch`)
+- [x] Reminders UI wired to the off-chain Supabase contract (wizard step 5 + cockpit modal)
+- [x] Accessibility: focus rings, reduced-motion, WCAG-AA contrast, modal focus-trap
+- [x] `?demo=1` flag hides the state-preview toggle on stage
+
+**On-chain wiring — remaining (the `// TODO` markers in `app/src/pages/`):**
+- [ ] `initialize` — wizard "ARM IT" → `program.methods.initialize(...).rpc()`
+- [ ] `check_in` / `deposit` / `update_config` / `cancel` — cockpit actions
+- [ ] `claim` — beneficiary screen
+- [ ] Fetch the Switch account on load; pre-check existing switch (replace `?existing=1` sim)
+- [ ] Real Supabase `subscribe` POST (replace mocked overlay)
+- [ ] Event subscription for the live activity feed (`program.addEventListener`)
 
 **Done when:** full lifecycle runnable from browser on devnet without touching terminal.
+*(Currently: full visual lifecycle runs; transactions are mocked.)*
 
 ---
 
