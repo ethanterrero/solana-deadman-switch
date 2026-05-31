@@ -23,6 +23,10 @@ export function ColdOpen() {
     const target = targetRef.current;
     if (!target) return;
 
+    // Clear first — guards against StrictMode's double-invoke (and HMR) stacking
+    // a second copy of the manifesto onto the first run's appended nodes.
+    target.innerHTML = "";
+
     if (reduced) {
       // Render all lines immediately
       target.innerHTML = MANIFESTO.map(
@@ -48,6 +52,8 @@ export function ColdOpen() {
     run();
     return () => {
       cancelled = true;
+      // Drop any partially-typed nodes so the remount starts clean.
+      target.innerHTML = "";
     };
   }, [reduced]);
 
@@ -112,10 +118,12 @@ export function ColdOpen() {
             <br />
             SWITCH<span className="text-green animate-blink">_</span>
           </h1>
-          {/* chromatic green echo */}
+          {/* chromatic green echo — full width + centered so it sits under the
+              white title; the 4px offset is applied via transform, not left/top,
+              so it stays horizontally centered instead of shrink-wrapping left. */}
           <h1
             aria-hidden
-            className="absolute top-1 left-1 -z-10 text-green opacity-30"
+            className="absolute inset-x-0 top-0 z-0 text-green opacity-30 text-center"
             style={{
               fontSize: "clamp(2.6rem, 9.5vw, 9rem)",
               fontWeight: 900,
@@ -123,6 +131,7 @@ export function ColdOpen() {
               lineHeight: "0.88",
               margin: 0,
               filter: "blur(.5px)",
+              transform: "translate(3px, 4px)",
             }}
           >
             DEAD MAN'S

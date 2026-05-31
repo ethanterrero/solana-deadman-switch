@@ -137,8 +137,12 @@ function RoleTile({
   return (
     <Link
       to={to}
-      className={`role-tile relative bg-panel border border-border p-9 no-underline text-text flex flex-col gap-6 min-h-[420px] cursor-pointer transition-all duration-300 hover:border-green/35 hover:bg-[#0d100e] hover:shadow-[0_0_0_1px_rgba(0,255,136,.25),0_0_80px_rgba(0,255,136,.18),inset_0_0_60px_rgba(0,255,136,.06)] hover:-translate-y-[3px] group animate-${
-        slide === "left" ? "slide-l" : "slide-r"
+      // NOTE: keep both animate-slide-l and animate-slide-r as complete literal
+      // class strings below — Tailwind's JIT can't see dynamically-built class
+      // names (`animate-${...}`), so constructing them leaves the tile stuck at
+      // its inline opacity:0.
+      className={`role-tile relative bg-panel border border-border p-9 no-underline text-text flex flex-col gap-6 min-h-[420px] cursor-pointer transition-all duration-300 hover:border-green/35 hover:bg-[#0d100e] hover:shadow-[0_0_0_1px_rgba(0,255,136,.25),0_0_80px_rgba(0,255,136,.18),inset_0_0_60px_rgba(0,255,136,.06)] hover:-translate-y-[3px] group ${
+        slide === "left" ? "animate-slide-l" : "animate-slide-r"
       }`}
       style={{
         opacity: 0,

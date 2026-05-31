@@ -1,11 +1,13 @@
 import { InputHTMLAttributes, forwardRef, ReactNode } from "react";
 
-type Props = InputHTMLAttributes<HTMLInputElement> & {
-  size?: "default" | "big" | "mega";
+// Omit the native `size` (number) so our variant prop doesn't collide with it.
+type FieldSize = "default" | "big" | "mega";
+type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
+  size?: FieldSize;
   invalid?: boolean;
 };
 
-const sizes = {
+const sizes: Record<FieldSize, string> = {
   default: "px-3 py-2.5 text-base",
   big: "px-5 py-5 text-xl font-semibold",
   mega: "px-5 py-6 text-6xl font-extrabold text-center tracking-tighter text-green [text-shadow:0_0_14px_rgba(0,255,136,.5)]",
