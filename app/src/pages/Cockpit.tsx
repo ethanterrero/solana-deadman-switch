@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { PublicKey } from "@solana/web3.js";
 import { Shell } from "../components/Shell";
 import { Stamp } from "../components/Stamp";
 import { BackLink } from "../components/BackLink";
@@ -7,8 +10,24 @@ import { WalletPill } from "../components/WalletPill";
 import { Countdown } from "../components/Countdown";
 import { StatusBadge } from "../components/StatusBadge";
 import { TxOverlay } from "../components/TxOverlay";
+import { ErrorToast } from "../components/ErrorToast";
 import { useDemoFlag } from "../hooks/useDemoFlag";
+import { useProgram } from "../hooks/useProgram";
+import { useTx } from "../hooks/useTx";
+import { useCountdown } from "../hooks/useCountdown";
 import { fmtSeconds, fmtUtc, shortAddr } from "../lib/format";
+import {
+  cancel as cancelIx,
+  checkIn as checkInIx,
+  deposit as depositIx,
+  explorerAddr,
+  fetchSwitch,
+  SwitchView,
+  toView,
+  updateConfig as updateConfigIx,
+} from "../lib/anchor";
+import { deriveSwitchPda } from "../lib/pda";
+import { subscribe } from "../lib/supabase";
 import { DepositModal } from "../components/modals/DepositModal";
 import { EditConfigModal } from "../components/modals/EditConfigModal";
 import { RemindersModal, ReminderSub } from "../components/modals/RemindersModal";
@@ -24,40 +43,74 @@ interface VaultEvent {
   color: "green" | "amber";
 }
 
-const NOW_FAKE_MS = Date.parse("2026-05-29T14:23:00Z"); // simulated "now" for the mockup
-const LAST_CHECKIN_MS = Date.parse("2026-05-11T14:23:00Z");
+/** Derive the escalating status purely from how much time is left. */
+function statusFromRemaining(remainingSec: number): CockpitState {
+  if (remainingSec <= 0) return "expired";
+  if (remainingSec < 3600) return "critical"; // < 1h
+  if (remainingSec < 86400) return "warning"; // < 24h
+  return "active";
+}
+
+/** "just now" / "3h ago" / "18 days ago" relative label. */
+function agoLabel(ms: number): string {
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)} days ago`;
+}
 
 export function Cockpit() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const demo = useDemoFlag();
+  const { publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
+  const { program, hasSigner } = useProgram();
+  const { pending, error, setError, run } = useTx();
 
-  // initial vault state derived from query params (set by the wizard)
-  const initialBen = params.get("ben") || "9mNxXkZpRq8vJ5Hk2tWxYzAbCdEfGhJkLmNpQrStUwY4";
-  const initialAmt = parseFloat(params.get("amt") || "5.0");
-  const initialInt = parseInt(params.get("int") || "30");
+  // Fallbacks from the wizard handoff (so the screen still renders pre-fetch
+  // or in demo without a real on-chain account).
+  const fbBen = params.get("ben") || "9mNxXkZpRq8vJ5Hk2tWxYzAbCdEfGhJkLmNpQrStUwY4";
+  const fbAmt = parseFloat(params.get("amt") || "5.0");
+  const fbInt = parseInt(params.get("int") || "30");
 
-  const [beneficiary, setBeneficiary] = useState(initialBen);
-  const [amountSol, setAmountSol] = useState(initialAmt);
-  const [intervalDays, setIntervalDays] = useState(initialInt);
-  const [vaultPda] = useState("8Hk9...vC3");
+  // Live on-chain view of the owner's switch (null until fetched / if none).
+  const [view, setView] = useState<SwitchView | null>(null);
 
-  // computed unlock time
-  const unlockAtMs = useMemo(
-    () => LAST_CHECKIN_MS + intervalDays * 86400 * 1000,
-    [intervalDays],
+  const refetch = useCallback(async () => {
+    if (!publicKey) return null;
+    const s = await fetchSwitch(program, publicKey);
+    const v = s ? toView(s) : null;
+    setView(v);
+    return v;
+  }, [program, publicKey]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Displayed values prefer real chain data, fall back to the wizard handoff.
+  const beneficiary = view?.beneficiary ?? fbBen;
+  const amountSol = view?.amountSol ?? fbAmt;
+  const intervalDays = view?.intervalDays ?? fbInt;
+  const lastCheckinMs = view?.lastCheckinMs ?? Date.now() - 18 * 86400 * 1000;
+  const vaultPda = useMemo(
+    () => (publicKey ? shortAddr(deriveSwitchPda(publicKey)[0].toBase58()) : "8Hk9...vC3"),
+    [publicKey],
   );
 
-  // state machine — for the mockup we pivot off a synthetic remaining-seconds value
-  const [state, setState] = useState<CockpitState>("active");
+  // ?demo=1 lets the presenter override remaining time for rehearsal.
   const [previewRemaining, setPreviewRemaining] = useState<number | null>(null);
+  const realUnlockMs = view?.unlockAtMs ?? lastCheckinMs + intervalDays * 86400 * 1000;
+  const effectiveUnlock = useMemo(
+    () => (previewRemaining == null ? realUnlockMs : Date.now() + previewRemaining * 1000),
+    [previewRemaining, realUnlockMs],
+  );
 
-  // when ?demo=1 is set, the user can override remaining time via the toggle
-  const effectiveUnlock = useMemo(() => {
-    if (previewRemaining == null) return unlockAtMs;
-    // synthetic: now + N seconds
-    return Date.now() + previewRemaining * 1000;
-  }, [previewRemaining, unlockAtMs]);
+  // Status is derived from the live countdown (real or demo-overridden).
+  const { remainingSec } = useCountdown(effectiveUnlock, 1000);
+  const state = statusFromRemaining(remainingSec);
 
   // reminders
   const [sub, setSub] = useState<ReminderSub>({
@@ -105,116 +158,122 @@ export function Cockpit() {
     null | "deposit" | "config" | "reminders" | "cancel"
   >(null);
 
-  // tx overlay
-  const [tx, setTx] = useState<null | {
-    fnName: string;
-    sub?: string;
-    variant?: "onchain" | "offchain";
-  }>(null);
-  function fireTx(fnName: string, sub?: string, variant?: "onchain" | "offchain") {
-    setTx({ fnName, sub, variant });
-    setTimeout(() => setTx(null), 1400);
+  // Prompt connect if there's no signer; otherwise hand back the owner pubkey.
+  function requireSigner(): PublicKey | null {
+    if (!hasSigner || !publicKey) {
+      setVisible(true);
+      return null;
+    }
+    return publicKey;
   }
 
-  // Actions
+  // Actions — each sends a real transaction, then refetches the switch.
   function doCheckIn() {
-    // TODO: program.methods.check_in().accounts({ switch: switchPda, owner: wallet.publicKey }).rpc()
-    fireTx("check_in", "last_checkin reset to Clock::now()");
-    setTimeout(() => {
-      pushEvent({
-        kind: "CheckedIn",
-        meta: "last_checkin reset",
-        sig: "newTx",
-        when: "just now",
-        color: "green",
-      });
-      // reset countdown
-      setPreviewRemaining(null);
-      setState("active");
-    }, 1500);
+    const owner = requireSigner();
+    if (!owner) return;
+    run(
+      { fnName: "check_in", sub: "last_checkin reset to Clock::now()" },
+      () => checkInIx(program, owner),
+      async (sig) => {
+        setPreviewRemaining(null);
+        await refetch();
+        pushEvent({ kind: "CheckedIn", meta: "last_checkin reset", sig: shortAddr(sig), when: "just now", color: "green" });
+      },
+    );
   }
 
   function doDeposit(addSol: number) {
-    // TODO: program.methods.deposit(new BN(addSol * LAMPORTS_PER_SOL)).accounts({...}).rpc()
+    const owner = requireSigner();
+    if (!owner) return;
     setOpenModal(null);
-    fireTx("deposit", `+${addSol.toFixed(2)} SOL`);
-    setTimeout(() => {
-      const newTotal = amountSol + addSol;
-      setAmountSol(newTotal);
-      pushEvent({
-        kind: "Deposited",
-        meta: `+${addSol.toFixed(2)} SOL · total ${newTotal.toFixed(2)} SOL`,
-        sig: "newTx",
-        when: "just now",
-        color: "green",
-      });
-    }, 1500);
+    run(
+      { fnName: "deposit", sub: `+${addSol.toFixed(2)} SOL` },
+      () => depositIx(program, owner, addSol),
+      async (sig) => {
+        const v = await refetch();
+        const total = v?.amountSol ?? amountSol + addSol;
+        pushEvent({ kind: "Deposited", meta: `+${addSol.toFixed(2)} SOL · total ${total.toFixed(2)} SOL`, sig: shortAddr(sig), when: "just now", color: "green" });
+      },
+    );
   }
 
   function doUpdateConfig(newBeneficiary?: string, newIntervalDays?: number) {
-    // TODO: program.methods.updateConfig(newBenOption, newIntervalOption).accounts({...}).rpc()
     if (!newBeneficiary && !newIntervalDays) {
-      alert("nothing to change — enter a new beneficiary, interval, or both.");
+      setError("Nothing to change — enter a new beneficiary, interval, or both.");
       return;
+    }
+    const owner = requireSigner();
+    if (!owner) return;
+    let benPk: PublicKey | null = null;
+    if (newBeneficiary) {
+      try {
+        benPk = new PublicKey(newBeneficiary);
+      } catch {
+        setError("New beneficiary is not a valid Solana address");
+        return;
+      }
     }
     setOpenModal(null);
     const parts: string[] = [];
-    if (newBeneficiary) {
-      parts.push(`ben → ${shortAddr(newBeneficiary)}`);
-      setBeneficiary(newBeneficiary);
-    }
-    if (newIntervalDays) {
-      parts.push(`interval → ${newIntervalDays}d`);
-      setIntervalDays(newIntervalDays);
-    }
-    fireTx("update_config", parts.join(" · "));
-    setTimeout(() => {
-      pushEvent({
-        kind: "ConfigUpdated",
-        meta: parts.join(" · "),
-        sig: "newTx",
-        when: "just now",
-        color: "green",
-      });
-    }, 1500);
+    if (newBeneficiary) parts.push(`ben → ${shortAddr(newBeneficiary)}`);
+    if (newIntervalDays) parts.push(`interval → ${newIntervalDays}d`);
+    run(
+      { fnName: "update_config", sub: parts.join(" · ") },
+      () => updateConfigIx(program, owner, benPk, newIntervalDays ? newIntervalDays * 86400 : null),
+      async (sig) => {
+        await refetch();
+        pushEvent({ kind: "ConfigUpdated", meta: parts.join(" · "), sig: shortAddr(sig), when: "just now", color: "green" });
+      },
+    );
   }
 
   function doCancel() {
-    // TODO: program.methods.cancel().accounts({...}).rpc()
+    const owner = requireSigner();
+    if (!owner) return;
     setOpenModal(null);
-    fireTx("cancel", `${amountSol.toFixed(2)} SOL returned · vault closed`);
-    setTimeout(() => {
-      pushEvent({
-        kind: "Cancelled",
-        sig: "newTx",
-        when: "just now",
-        color: "green",
-      });
-      setTimeout(() => navigate("/identify"), 1200);
-    }, 1500);
+    run(
+      { fnName: "cancel", sub: `${amountSol.toFixed(2)} SOL returned · vault closed` },
+      () => cancelIx(program, owner),
+      (sig) => {
+        pushEvent({ kind: "Cancelled", sig: shortAddr(sig), when: "just now", color: "green" });
+        setTimeout(() => navigate("/identify"), 1200);
+      },
+    );
   }
 
   function saveReminders(next: ReminderSub) {
-    // TODO: await subscribe({ switch_pda, owner_pubkey, ... })
-    setSub(next);
+    const owner = requireSigner();
+    if (!owner) return;
     setOpenModal(null);
+    const [switchPda] = deriveSwitchPda(owner);
     const chans = [next.emailEnabled && "email", next.telegramEnabled && "telegram"]
       .filter(Boolean)
       .join(" + ");
-    fireTx(
-      "subscribe (off-chain)",
-      `${chans} · lead ${fmtSeconds(next.leadSeconds)} · repeat ${fmtSeconds(next.frequencySeconds)}`,
-      "offchain",
+    run(
+      {
+        fnName: "subscribe (off-chain)",
+        variant: "offchain",
+        sub: `${chans} · lead ${fmtSeconds(next.leadSeconds)} · repeat ${fmtSeconds(next.frequencySeconds)}`,
+      },
+      () =>
+        subscribe({
+          switch_pda: switchPda.toBase58(),
+          owner_pubkey: owner.toBase58(),
+          email: next.emailEnabled ? next.email || undefined : undefined,
+          telegram_chat_id: next.telegramEnabled ? next.telegram || undefined : undefined,
+          lead_seconds: next.leadSeconds,
+          frequency_seconds: next.frequencySeconds,
+          enabled: next.enabled,
+        }),
+      (res) => {
+        if (!res.ok) {
+          setError(`Subscribe failed: ${res.error}`);
+          return;
+        }
+        setSub(next);
+        pushEvent({ kind: "Subscribed (off-chain)", meta: `${chans} · lead ${fmtSeconds(next.leadSeconds)}`, sig: "supabase", when: "just now", color: "amber" });
+      },
     );
-    setTimeout(() => {
-      pushEvent({
-        kind: "Subscribed (off-chain)",
-        meta: `${chans} · lead ${fmtSeconds(next.leadSeconds)}`,
-        sig: "supabase",
-        when: "just now",
-        color: "amber",
-      });
-    }, 1500);
   }
 
   // Keyboard
@@ -234,11 +293,11 @@ export function Cockpit() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openModal, demo]);
 
+  // Demo override — sets a synthetic remaining time; `state` re-derives from it.
   function setPreviewState(s: CockpitState) {
-    setState(s);
     switch (s) {
       case "active":
-        setPreviewRemaining(null);
+        setPreviewRemaining(11 * 86400 + 23 * 3600 + 47 * 60 + 12);
         break;
       case "warning":
         setPreviewRemaining(12 * 3600 + 14 * 60 + 38);
@@ -368,7 +427,7 @@ export function Cockpit() {
         <div className="text-center mt-6 text-sm text-muted">
           next deadline ·{" "}
           <span className="font-semibold" style={{ color: "var(--status)" }}>
-            {fmtUtc(unlockAtMs)}
+            {fmtUtc(effectiveUnlock)}
           </span>
         </div>
 
@@ -397,8 +456,8 @@ export function Cockpit() {
 
         <div className="text-center mt-6 text-sm text-muted">
           last check-in ·{" "}
-          <span className="font-semibold text-text">18 days ago</span> ·{" "}
-          {fmtUtc(LAST_CHECKIN_MS)}
+          <span className="font-semibold text-text">{agoLabel(lastCheckinMs)}</span> ·{" "}
+          {fmtUtc(lastCheckinMs)}
         </div>
 
         {/* Secondary actions */}
@@ -427,10 +486,8 @@ export function Cockpit() {
           <div className="flex gap-2">
             <button
               onClick={() =>
-                window.open(
-                  `https://explorer.solana.com/address/8Hk9vC3?cluster=devnet`,
-                  "_blank",
-                )
+                publicKey &&
+                window.open(explorerAddr(deriveSwitchPda(publicKey)[0].toBase58()), "_blank")
               }
               className="text-[0.7rem] tracking-[0.25em] uppercase text-muted cursor-pointer px-3 py-2 border border-transparent transition-colors hover:text-text hover:border-border"
             >
@@ -471,8 +528,8 @@ export function Cockpit() {
         onClose={() => setOpenModal(null)}
         currentBeneficiary={beneficiary}
         currentIntervalDays={intervalDays}
-        lastCheckinMs={LAST_CHECKIN_MS}
-        nowMs={NOW_FAKE_MS}
+        lastCheckinMs={lastCheckinMs}
+        nowMs={Date.now()}
         onSave={doUpdateConfig}
       />
       <RemindersModal
@@ -492,13 +549,11 @@ export function Cockpit() {
         onConfirm={doCancel}
       />
 
-      {tx && (
-        <TxOverlay
-          fnName={tx.fnName}
-          sub={tx.sub}
-          variant={tx.variant}
-        />
+      {pending && (
+        <TxOverlay fnName={pending.fnName} sub={pending.sub} variant={pending.variant} />
       )}
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
+
 
       <style>{`
         @keyframes ctaBreath {

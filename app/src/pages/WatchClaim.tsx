@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { PublicKey } from "@solana/web3.js";
 import { Shell } from "../components/Shell";
 import { Stamp } from "../components/Stamp";
 import { BackLink } from "../components/BackLink";
@@ -9,10 +12,13 @@ import { Button } from "../components/Button";
 import { Countdown } from "../components/Countdown";
 import { StatusBadge } from "../components/StatusBadge";
 import { TxOverlay } from "../components/TxOverlay";
+import { ErrorToast } from "../components/ErrorToast";
 import { VaultGlyph } from "../components/VaultGlyph";
 import { useDemoFlag } from "../hooks/useDemoFlag";
 import { useReducedMotion } from "../hooks/useReducedMotion";
-import { fmtUtc, shortAddr } from "../lib/format";
+import { useProgram } from "../hooks/useProgram";
+import { claim as claimIx, fetchSwitch, SwitchView, toView, txErrorMessage } from "../lib/anchor";
+import { fmtUtc, looksLikeSolanaAddress, shortAddr } from "../lib/format";
 
 type WatchState = "empty" | "watching" | "nearing" | "claimable" | "claimed";
 
@@ -20,44 +26,74 @@ export function WatchClaim() {
   const navigate = useNavigate();
   const demo = useDemoFlag();
   const reduced = useReducedMotion();
+  const { publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
+  const { program, hasSigner } = useProgram();
 
   const [state, setState] = useState<WatchState>("empty");
-  const [ownerInput, setOwnerInput] = useState(
-    "7xK4NqRsTpVwXyZ1AbCdEfGhJkLmNpQrStUw9V8MzPq2",
-  );
+  const [ownerInput, setOwnerInput] = useState("");
   const [ownerAddr, setOwnerAddr] = useState("");
+  const [view, setView] = useState<SwitchView | null>(null);
   const [unlockAtMs, setUnlockAtMs] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function loadVault() {
-    if (ownerInput.length < 32) return;
+  // Amount shown — real once a vault is loaded, else the demo default.
+  const amountSol = view?.amountSol ?? 5.0;
+
+  // Look up the owner's switch on-chain and decode it.
+  async function loadVault() {
+    const v = ownerInput.trim();
+    if (!looksLikeSolanaAddress(v)) {
+      setError("Enter a valid Solana wallet address (base58)");
+      return;
+    }
+    let ownerPk: PublicKey;
+    try {
+      ownerPk = new PublicKey(v);
+    } catch {
+      setError("That isn't a valid Solana address");
+      return;
+    }
+    setError(null);
     setLoading(true);
-    setOwnerAddr(ownerInput);
-    // TODO: derive PDA from owner pubkey, getAccountInfo, decode Switch
-    setTimeout(() => {
+    try {
+      const s = await fetchSwitch(program, ownerPk);
+      if (!s) {
+        setError("No vault found for that address");
+        return;
+      }
+      const decoded = toView(s);
+      setView(decoded);
+      setOwnerAddr(v);
+      setUnlockAtMs(decoded.unlockAtMs);
+      const remaining = (decoded.unlockAtMs - Date.now()) / 1000;
+      setState(remaining <= 0 ? "claimable" : remaining < 60 ? "nearing" : "watching");
+    } catch (e) {
+      setError(txErrorMessage(e));
+    } finally {
       setLoading(false);
-      setState("watching");
-      // 11d 23h 47m 12s from now
-      setUnlockAtMs(Date.now() + (11 * 86400 + 23 * 3600 + 47 * 60 + 12) * 1000);
-    }, 1200);
+    }
   }
 
+  // Demo override (?demo=1) — synthetic remaining time, no chain read.
   function setPreviewState(s: WatchState) {
+    const demoOwner = ownerInput || "7xK4NqRsTpVwXyZ1AbCdEfGhJkLmNpQrStUw9V8MzPq2";
     if (s === "empty") {
       setUnlockAtMs(null);
     } else if (s === "watching") {
-      setOwnerAddr(ownerInput);
+      setOwnerAddr(demoOwner);
       setUnlockAtMs(Date.now() + (11 * 86400 + 23 * 3600 + 47 * 60 + 12) * 1000);
     } else if (s === "nearing") {
-      setOwnerAddr(ownerInput);
+      setOwnerAddr(demoOwner);
       setUnlockAtMs(Date.now() + 47 * 1000);
     } else if (s === "claimable") {
-      setOwnerAddr(ownerInput);
+      setOwnerAddr(demoOwner);
       setUnlockAtMs(Date.now() - 1000);
     } else if (s === "claimed") {
-      setOwnerAddr(ownerInput);
+      setOwnerAddr(demoOwner);
       setUnlockAtMs(Date.now() - 60_000);
     }
     setState(s);
@@ -73,12 +109,23 @@ export function WatchClaim() {
   }
 
   function executeClaim() {
-    // TODO: program.methods.claim().accounts({ switch: switchPda, beneficiary: wallet.publicKey }).rpc()
+    if (!hasSigner || !publicKey) {
+      setVisible(true);
+      return;
+    }
+    let ownerPk: PublicKey;
+    try {
+      ownerPk = new PublicKey(ownerAddr);
+    } catch {
+      setError("Owner address is invalid");
+      return;
+    }
+    setError(null);
     setClaiming(true);
-    setTimeout(() => {
-      setClaiming(false);
-      setState("claimed");
-    }, 2000);
+    claimIx(program, ownerPk, publicKey)
+      .then(() => setState("claimed"))
+      .catch((e) => setError(txErrorMessage(e)))
+      .finally(() => setClaiming(false));
   }
 
   // Keyboard: SPACE claim if claimable, ENTER load if empty
@@ -260,7 +307,7 @@ export function WatchClaim() {
                         : undefined,
                   }}
                 >
-                  5.00 SOL
+                  {amountSol.toFixed(2)} SOL
                 </div>
               </div>
 
@@ -289,7 +336,7 @@ export function WatchClaim() {
                     style={{ borderColor: "var(--status)" }}
                   />
                   <span>
-                    {state === "claimable" ? "▸ CLAIM 5.00 SOL" : "◆ CLAIM"}
+                    {state === "claimable" ? `▸ CLAIM ${amountSol.toFixed(2)} SOL` : "◆ CLAIM"}
                   </span>
                   <span className="text-xs tracking-[0.22em] font-medium text-muted-deep">
                     {state === "claimable"
@@ -358,7 +405,7 @@ export function WatchClaim() {
                       "0 0 28px rgba(0,255,136,.6), 0 0 80px rgba(0,255,136,.3)",
                   }}
                 >
-                  5.00 SOL
+                  {amountSol.toFixed(2)} SOL
                 </div>
               </div>
 
@@ -444,6 +491,8 @@ export function WatchClaim() {
           sub="require now >= last_checkin + interval → transfer lamports → close Switch PDA → emit Claimed event"
         />
       )}
+
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
 
       <style>{`
         @keyframes amountBreathe {

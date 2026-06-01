@@ -37,19 +37,30 @@ npm run dev
 
 ## What's wired vs mocked
 
-**Wired:**
-- Wallet adapter (Phantom, Solflare)
-- WalletPill polls live SOL balance every 15s
-- Date.now()-based countdown (drift-free)
-- Wallet modal opens via "CONNECT WALLET" CTA
+**Wired (real, on devnet):**
+- Wallet adapter (Phantom, Solflare); WalletPill polls live SOL balance every 15s
+- Typed Anchor client — `useProgram()` builds `Program<DeadmanSwitch>` from the
+  connected wallet (read-only stand-in before connect so account fetches work).
+- **All six instructions** via `src/lib/anchor.ts`:
+  `initialize`, `check_in`, `deposit`, `update_config`, `claim`, `cancel` —
+  each sends a real tx and the cockpit refetches the `Switch` account after.
+- **Switch account fetch + decode** — the cockpit derives its countdown/status
+  from the real `last_checkin + interval`; the beneficiary screen looks a vault
+  up by owner address (`getAccountInfo` on the PDA).
+- **Supabase `subscribe` POST** — wizard step 5 + the cockpit reminders modal
+  hit `/functions/v1/subscribe` for real.
+- Write actions gate on a connected signer (open the wallet modal if absent);
+  errors surface in an `ErrorToast`; `Date.now()`-based drift-free countdown.
 
-**Mocked (with `// TODO: real Anchor call` markers):**
-- All program instructions (`initialize`, `check_in`, `deposit`, `update_config`, `claim`, `cancel`)
-- Switch account fetch / event subscription
-- Supabase `subscribe` POST
-- Activity feed (in-memory)
+**Still mocked / simplified:**
+- Activity feed is session-local (pushes real tx signatures as actions happen),
+  not yet a live `program.addEventListener` subscription.
+- Beneficiary auto-discover (`getProgramAccounts` filtered by `beneficiary`) is
+  still a paste-the-owner-address flow.
+- The deposit modal's wallet-balance figure is a placeholder.
 
-Real wiring lands in a follow-up PR. The visual flow is complete.
+The `?demo=1` state toggles (cockpit/watch) drive synthetic countdowns for
+rehearsal without waiting for a real interval to elapse.
 
 ## Accessibility
 

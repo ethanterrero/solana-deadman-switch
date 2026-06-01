@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { PublicKey } from "@solana/web3.js";
 import { Shell } from "../components/Shell";
 import { Stamp } from "../components/Stamp";
 import { BackLink } from "../components/BackLink";
@@ -9,11 +11,16 @@ import { Field, FieldHint, FieldLabel } from "../components/Field";
 import { PresetGroup } from "../components/PresetGroup";
 import { Button } from "../components/Button";
 import { TxOverlay } from "../components/TxOverlay";
+import { ErrorToast } from "../components/ErrorToast";
 import { useFlag } from "../hooks/useDemoFlag";
+import { useProgram } from "../hooks/useProgram";
+import { useTx } from "../hooks/useTx";
+import { fetchSwitch, initialize } from "../lib/anchor";
+import { deriveSwitchPda } from "../lib/pda";
+import { subscribe } from "../lib/supabase";
 import { fmtInterval, fmtSeconds, looksLikeSolanaAddress, shortAddr } from "../lib/format";
 
 type Step = 1 | 2 | 3 | 4 | 5;
-type TxState = null | "arming" | "subscribing";
 
 interface ReminderState {
   emailEnabled: boolean;
@@ -42,16 +49,18 @@ const TICKS: { n: Step; label: string }[] = [
 
 export function ArmVault() {
   const navigate = useNavigate();
-  const { connected } = useWallet();
+  const { connected, publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
+  const { program, hasSigner } = useProgram();
+  const { pending, error, setError, run } = useTx();
   const existingFlag = useFlag("existing");
 
-  // ?existing=1 simulates a switch already deployed for this owner
+  // Banner shows if a switch already exists for this owner — detected on-chain,
+  // or forced via ?existing=1 for design preview.
   const [showExisting, setShowExisting] = useState(existingFlag);
 
   const [step, setStep] = useState<Step>(1);
-  const [beneficiary, setBeneficiary] = useState(
-    "9mNxXkZpRq8vJ5Hk2tWxYzAbCdEfGhJkLmNpQrStUwY4",
-  );
+  const [beneficiary, setBeneficiary] = useState("");
   const [intervalDays, setIntervalDays] = useState(30);
   const [amountSol, setAmountSol] = useState(5.0);
   const [reminder, setReminder] = useState<ReminderState>({
@@ -62,24 +71,46 @@ export function ArmVault() {
     leadSeconds: 21600,
     frequencySeconds: 900,
   });
-  const [tx, setTx] = useState<TxState>(null);
 
   const beneficiaryValid = useMemo(
     () => looksLikeSolanaAddress(beneficiary),
     [beneficiary],
   );
 
-  // Step 4 arm → step 5
+  // Pre-check: does a switch PDA already exist for this owner? (initialize would
+  // fail with "already in use".) Runs whenever the connected wallet changes.
+  useEffect(() => {
+    if (!publicKey) return;
+    let cancelled = false;
+    fetchSwitch(program, publicKey).then((s) => {
+      if (!cancelled && s) setShowExisting(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [program, publicKey]);
+
+  // Step 4 ARM IT → initialize() on-chain → step 5 (reminders)
   function armVault() {
-    // TODO: real Anchor call:
-    //   await program.methods.initialize(new PublicKey(beneficiary), new BN(intervalDays * 86400), new BN(amountSol * LAMPORTS_PER_SOL))
-    //     .accounts({ switch: switchPda, owner: wallet.publicKey, systemProgram: SystemProgram.programId })
-    //     .rpc()
-    setTx("arming");
-    setTimeout(() => {
-      setTx(null);
-      setStep(5);
-    }, 2000);
+    if (!hasSigner || !publicKey) {
+      setVisible(true);
+      return;
+    }
+    let benPk: PublicKey;
+    try {
+      benPk = new PublicKey(beneficiary);
+    } catch {
+      setError("Beneficiary is not a valid Solana address");
+      return;
+    }
+    run(
+      {
+        fnName: "initialize",
+        sub: "wallet popup → confirm → vault PDA created → SwitchInitialized emitted",
+      },
+      () => initialize(program, publicKey, benPk, intervalDays * 86400, amountSol),
+      () => setStep(5),
+    );
   }
 
   function navigateToCockpit(withReminders: boolean) {
@@ -105,14 +136,40 @@ export function ArmVault() {
     navigate(`/cockpit?${qs.toString()}`);
   }
 
+  // Step 5 SUBSCRIBE → POST /functions/v1/subscribe (off-chain) → cockpit
   function subscribeAndContinue() {
-    // TODO: real fetch:
-    //   await subscribe({ switch_pda, owner_pubkey, email: reminder.email, ... })
-    setTx("subscribing");
-    setTimeout(() => {
-      setTx(null);
-      navigateToCockpit(true);
-    }, 1400);
+    if (!publicKey) {
+      navigateToCockpit(false);
+      return;
+    }
+    if (!reminder.emailEnabled && !reminder.telegramEnabled) {
+      setError("Enable at least one channel, or use SKIP");
+      return;
+    }
+    const [switchPda] = deriveSwitchPda(publicKey);
+    run(
+      {
+        fnName: "subscribe (off-chain)",
+        variant: "offchain",
+        sub: "verify switch.owner == owner_pubkey on-chain → upsert reminder_subscriptions",
+      },
+      () =>
+        subscribe({
+          switch_pda: switchPda.toBase58(),
+          owner_pubkey: publicKey.toBase58(),
+          email: reminder.emailEnabled ? reminder.email || undefined : undefined,
+          telegram_chat_id: reminder.telegramEnabled
+            ? reminder.telegram || undefined
+            : undefined,
+          lead_seconds: reminder.leadSeconds,
+          frequency_seconds: reminder.frequencySeconds,
+          enabled: true,
+        }),
+      (res) => {
+        if (res.ok) navigateToCockpit(true);
+        else setError(`Subscribe failed: ${res.error}`);
+      },
+    );
   }
 
   // Keyboard
@@ -229,19 +286,10 @@ export function ArmVault() {
         )}
       </main>
 
-      {tx === "arming" && (
-        <TxOverlay
-          fnName="initialize"
-          sub="wallet popup → confirm → tx broadcasts → vault PDA created → SwitchInitialized event emitted"
-        />
+      {pending && (
+        <TxOverlay fnName={pending.fnName} sub={pending.sub} variant={pending.variant} />
       )}
-      {tx === "subscribing" && (
-        <TxOverlay
-          fnName="subscribe (off-chain)"
-          variant="offchain"
-          sub="verify switch.owner == owner_pubkey on-chain → upsert into reminder_subscriptions"
-        />
-      )}
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
     </Shell>
   );
 }
