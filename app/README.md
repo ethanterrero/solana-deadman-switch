@@ -80,8 +80,6 @@ rehearsal without waiting for a real interval to elapse.
 
 ## Next
 
-- Real Anchor instruction wiring (replace `// TODO` markers in each page)
 - Event subscription for live activity feed (`program.addEventListener('Deposited', ...)`)
-- Real Supabase `subscribe` POST
 - Modal focus polish (some modals still need `aria-describedby`)
 - `getProgramAccounts` filter for beneficiary auto-discover on `/watch`

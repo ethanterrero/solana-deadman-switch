@@ -1,137 +1,163 @@
 # Solana Dead Man's Switch
 
-**Track:** Best Use of Solana
-**Pitch:** A trustless, server-less inheritance vault. Funds release to a named beneficiary only if the owner stops checking in. No custodian, no keeper bot — all enforcement on-chain.
+A trustless inheritance vault built on Solana. An owner deposits SOL, names a
+beneficiary, and chooses a check-in interval. If the owner stops checking in,
+the beneficiary can claim the vault after the deadline.
 
-**Core insight:** Time is enforced *lazily*. There is no cron job or background process. The beneficiary's `claim` transaction itself checks whether enough time has passed since the owner's last check-in. The check-in *is* the liveness signal.
+The core program is intentionally simple: no custodian, no keeper service, and
+no privileged server decides when funds move. The beneficiary's `claim`
+transaction checks the deadline on-chain.
 
----
+> Built for the Solana track of a hackathon. The current deployment is a devnet
+> prototype and has not been audited. Do not use it to custody real funds.
 
-## Status
+## Live Status
 
-- [x] Phase 0 — Setup (toolchain, wallets funded)
-- [x] Phase 1 — Program (initialize, check_in, deposit, update_config, claim, cancel) — **deployed to devnet**, IDL frozen
-- [x] Phase 2 — Anchor tests — `anchor test` green (11 passing)
-- [~] Phase 3 — Frontend — **UI complete, on-chain wiring in progress** (see below)
-- [ ] Phase 4 — Demo prep
-- [ ] Phase 5 — Submission
+- Anchor program deployed on Solana devnet
+- Full owner flow wired in the browser: initialize, check in, deposit, update,
+  and cancel
+- Beneficiary lookup and claim flow wired against live on-chain state
+- Optional email and Telegram reminder service implemented with Supabase Edge
+  Functions
+- Anchor tests and a live devnet lifecycle smoke test included
 
-**Devnet program ID:** `6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu` — live on devnet (upgradeable; upgrade authority = owner wallet). On-chain IDL available via `anchor idl fetch`.
+**Devnet program:** [`6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu`](https://explorer.solana.com/address/6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu?cluster=devnet)
 
-### Phase 3 detail
+## How It Works
 
-The frontend (`app/`) is a Vite + React + TS app in a single visual language —
-**"Terminal Vault"** (black / neon-green, JetBrains Mono, CRT scanlines). It's a
-five-screen *cinematic wizard*, not a single control panel:
+```mermaid
+sequenceDiagram
+    participant O as Owner
+    participant P as Solana Program
+    participant B as Beneficiary
 
-| Route | Screen | Status |
-|---|---|---|
-| `/` | Cold open — manifesto + INITIATE | ✅ built |
-| `/identify` | Role select — OWNER vs BENEFICIARY | ✅ built |
-| `/arm` | Owner wizard — beneficiary → interval → amount → oath → reminders | ✅ UI · ⏳ tx mocked |
-| `/cockpit` | Owner cockpit — live countdown, CHECK_IN, deposit/edit/reminders/cancel | ✅ UI · ⏳ tx mocked |
-| `/watch` | Beneficiary — watch the countdown, claim at zero | ✅ UI · ⏳ tx mocked |
-
-- ✅ **Wired:** wallet-adapter (Phantom + Solflare, devnet), live balance, drift-free
-  `Date.now()`-based countdown, routing, accessibility (focus rings, reduced-motion,
-  WCAG-AA contrast, modal focus-trap), `?demo=1` state-preview flag.
-- ⏳ **Mocked (next):** the six program instructions, the Supabase `subscribe` POST,
-  and the event-driven activity feed are stubbed with `// TODO` markers and a fake
-  tx overlay. The full visual lifecycle runs; no transaction is broadcast yet.
-
-**Done when:** full lifecycle runnable from the browser on devnet — i.e. the `// TODO`
-markers are replaced with real `program.methods.*().rpc()` calls. See `app/README.md`.
-
----
-
-## Repo layout
-
-```
-deadman-switch/
-├── programs/deadman-switch/   # Anchor program (Device A)
-├── tests/                     # Anchor tests in TS (Device A)
-├── scripts/smoke-devnet.ts    # Full-lifecycle smoke test against live devnet
-├── app/                       # Vite + React frontend (Device B) — see app/README.md
-├── design-mockups/            # Static HTML mockups (design history; superseded by app/)
-├── supabase/                  # Off-chain reminder notifier (Postgres + 2 Edge Functions)
-├── target/idl/                # Generated IDL — committed so Device B can consume
-├── PLAN.md                    # Full build plan, phase by phase
-├── DEVICE_SPLIT.md            # Two-device work split + handoffs
-└── TASKS.md                   # Live checklist
+    O->>P: initialize(beneficiary, interval, amount)
+    O->>P: check_in()
+    Note over P: Deadline resets on every check-in
+    B->>P: claim()
+    alt Owner is still active
+        P-->>B: Revert with StillActive
+    else Deadline has elapsed
+        P-->>B: Close vault PDA and release SOL
+    end
 ```
 
----
+Each owner has one vault PDA derived from `["switch", owner_pubkey]`. The
+program stores the owner, beneficiary, last check-in timestamp, interval, and
+deposited amount.
 
-## Quick start
+| Instruction | Who can call it | Effect |
+| --- | --- | --- |
+| `initialize` | Owner | Creates the vault PDA and deposits SOL |
+| `check_in` | Owner | Resets the liveness timestamp |
+| `deposit` | Owner | Adds SOL to an active vault |
+| `update_config` | Owner | Changes the beneficiary or interval |
+| `claim` | Beneficiary | Releases SOL after the deadline |
+| `cancel` | Owner | Closes the vault and returns SOL |
 
-### Prereqs (per device)
-- **Device A (program):** Solana CLI, Rust, Anchor (via `avm`), Node
-- **Device B (frontend):** Node + pnpm/npm only
+## Optional Reminders
 
-### One-time setup
-See `PLAN.md` Phase 0 for the exact commands. Short version:
+The on-chain vault does not depend on an off-chain service. The optional
+Supabase integration sends reminders before a deadline so the owner has time to
+check in.
+
+- `subscribe` registers or updates an owner's notification preferences after
+  verifying the vault on-chain.
+- `reminder-tick` checks active subscriptions and sends email or Telegram
+  notifications inside the configured warning window.
+
+If the reminder service is unavailable, the program still behaves exactly the
+same way. Contact details remain off-chain. See
+[`supabase/SETUP.md`](supabase/SETUP.md) for deployment details.
+
+## Repository Layout
+
+```text
+.
+├── programs/deadman-switch/   # Anchor program
+├── tests/                     # Local Anchor integration tests
+├── scripts/                   # Devnet smoke test and demo seeding script
+├── app/                       # Vite + React frontend
+├── supabase/                  # Optional reminder service
+├── target/idl/                # Committed IDL consumed by the frontend
+└── DEMO.md                    # Short live-demo walkthrough
+```
+
+## Run Locally
+
+### Prerequisites
+
+- Rust and Cargo
+- Solana CLI configured for devnet
+- Anchor CLI
+- Node.js and npm
+- A funded devnet wallet at `~/.config/solana/id.json`
+
+### Program
 
 ```bash
-# Device A only
-cargo install --git https://github.com/coral-xyz/anchor avm --force
-avm install latest && avm use latest
+npm install
 solana config set --url devnet
-solana-keygen new                       # owner wallet
-solana-keygen new -o ~/.config/solana/beneficiary.json
-solana airdrop 2
-
-cd programs/deadman-switch && anchor build && anchor deploy
-```
-
-### Run locally
-```bash
-# Device A — program tests
+anchor build
 anchor test
-
-# Device A — full lifecycle against live devnet
-npx ts-node scripts/smoke-devnet.ts
-
-# Device B — frontend dev server
-cd app && npm install && npm run dev   # http://localhost:5173
 ```
 
-**Walk the demo flow:** open `/` → INITIATE → pick OWNER → step through the wizard →
-land in the cockpit. Or pick BENEFICIARY → load an owner address → watch the countdown
-→ CLAIM at zero. Append `?demo=1` to `/cockpit` or `/watch` to reveal the hidden
-state-preview toggle (lets you jump straight to CLAIMABLE/EXPIRED for rehearsal).
+### Frontend
 
----
+```bash
+cd app
+npm install
+npm run dev
+```
 
-## How it works (judge talking point)
+Open [`http://localhost:5173`](http://localhost:5173), connect Phantom or
+Solflare on devnet, and follow the owner or beneficiary flow.
 
-1. `initialize` creates a Switch PDA seeded on the owner pubkey, stores `(owner, beneficiary, last_checkin, interval, amount)`, and deposits SOL into the PDA. Guards: `interval > 0`, `amount > 0`, `beneficiary != owner`.
-2. `check_in` (owner only) resets `last_checkin = Clock::now()`.
-3. `deposit` (owner only) tops up a live switch with more SOL.
-4. `update_config` (owner only) changes the beneficiary and/or interval.
-5. `claim` (beneficiary only) requires `now >= last_checkin + interval`, otherwise reverts with `StillActive`.
-6. `cancel` (owner only) returns funds.
+### Live Devnet Smoke Test
 
-Every instruction emits an event (`SwitchInitialized`, `CheckedIn`, `Deposited`, `ConfigUpdated`, `Claimed`, `Cancelled`) so the frontend can render a live activity feed and react to a claim.
+The smoke test creates a vault, proves that an early claim fails, waits for the
+deadline, claims the vault, and verifies that the PDA closes.
 
-The deadline is never *triggered* — it is *checked* by the claim transaction. No keeper, no cron. The vault is alive forever and only releases when both the time gate and the beneficiary signature align.
+```bash
+ANCHOR_PROVIDER_URL=https://api.devnet.solana.com \
+ANCHOR_WALLET=$HOME/.config/solana/id.json \
+npx ts-mocha -p ./tsconfig.json -t 1000000 scripts/smoke-devnet.ts
+```
 
----
+## Demo Mode
 
-## Reminders (off-chain, advisory)
+For a fast live walkthrough, use `/arm?fast=1`. It exposes second-based
+intervals so the full create-to-claim lifecycle can run during a short demo.
 
-The on-chain program is self-sufficient. On top of it, an **optional** notifier
-warns the owner before their switch unlocks so they can check in. It lives in
-`supabase/` (Postgres + two Edge Functions) and is the only off-chain piece:
+The UI also supports `?demo=1` on `/cockpit` and `/watch` for rehearsal-only
+state previews. These previews do not replace the real devnet transaction flow.
+See [`DEMO.md`](DEMO.md) for the full walkthrough.
 
-- `subscribe` — the frontend registers the owner's email / Telegram + cadence
-  (`lead_seconds`, `frequency_seconds`). It verifies the switch exists on-chain
-  and that `owner_pubkey` matches `switch.owner` before storing anything.
-- `reminder-tick` — runs every minute (pg_cron), reads each switch's
-  `last_checkin + interval` straight off devnet, and fires email (Resend) +
-  Telegram when inside the owner's chosen warning window.
+## Security Notes
 
-**This is purely advisory — it is not part of enforcement.** `claim` still
-requires the on-chain time gate, so even if the notifier is down, late, or wiped,
-funds are exactly as safe. Contact info is PII and lives off-chain only (never on
-the public ledger). See `supabase/SETUP.md` for secrets, the frontend contract,
-and operations.
+- Deadline enforcement happens in the Solana program, not in the reminder
+  service or frontend.
+- Only the configured owner can check in, deposit, update, or cancel.
+- Only the configured beneficiary can claim.
+- Claims before `last_checkin + interval` fail with `StillActive`.
+- The devnet program is upgradeable and controlled by the deployment wallet.
+- This prototype has not received a security audit.
+
+## Current Limitations
+
+- SOL deposits only; SPL token support is not implemented.
+- One active vault per owner wallet.
+- Beneficiary discovery currently requires the owner's address.
+- The activity feed is session-local rather than a persistent event index.
+- The frontend is configured for devnet.
+
+## Documentation
+
+- [`app/README.md`](app/README.md): frontend architecture and routes
+- [`supabase/SETUP.md`](supabase/SETUP.md): optional reminders deployment
+- [`DEMO.md`](DEMO.md): live demo walkthrough
+- [`DEMO_QA.md`](DEMO_QA.md): project Q&A
+
+## License
+
+ISC
