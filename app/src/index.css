@@ -199,11 +199,77 @@ button:focus-visible, a:focus-visible {
   .flash-white { animation: none !important; opacity: 0 !important; }
 }
 
-/* === WALLET ADAPTER OVERRIDES === */
-/* hide built-in styles, we render our own button */
-.wallet-adapter-button {
-  background: transparent !important;
-  font-family: inherit !important;
-  height: auto !important;
-  padding: 0 !important;
+/* === WALLET ADAPTER MODAL — themed to match Terminal Vault === */
+/* The app renders its own connect trigger (WalletPill), so the only place the
+   adapter's own UI shows is the connect modal. These rules restyle that modal
+   so it stops fighting the terminal aesthetic (black panel, hard corners,
+   JetBrains Mono, green accents) instead of the stock rounded blue card. */
+
+.wallet-adapter-modal-overlay {
+  background: rgba(0, 0, 0, 0.78) !important;
+  backdrop-filter: blur(4px);
 }
+
+.wallet-adapter-modal-wrapper {
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.06), 0 20px 60px rgba(0, 0, 0, 0.8) !important;
+  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  padding-bottom: 10px !important;
+}
+
+.wallet-adapter-modal-title {
+  color: var(--text) !important;
+  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.3 !important;
+  padding: 56px 48px 14px !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  top: 16px !important;
+  right: 16px !important;
+  padding: 9px !important;
+  transition: border-color 160ms ease !important;
+}
+.wallet-adapter-modal-button-close:hover { border-color: var(--green) !important; }
+.wallet-adapter-modal-button-close svg { fill: var(--muted) !important; transition: fill 160ms ease; }
+.wallet-adapter-modal-button-close:hover svg { fill: var(--green) !important; }
+
+.wallet-adapter-modal-list { margin: 0 16px 6px !important; gap: 8px !important; }
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: var(--panel-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--text) !important;
+  height: auto !important;
+  padding: 14px 18px !important;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
+  background: rgba(0, 255, 136, 0.06) !important;
+  border-color: var(--green) !important;
+  color: var(--green) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button-end-icon {
+  color: var(--muted) !important;
+}
+
+.wallet-adapter-modal-list-more {
+  color: var(--muted) !important;
+  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.wallet-adapter-modal-list-more:hover { color: var(--green) !important; }
+.wallet-adapter-modal-list-more svg { fill: currentColor !important; }
