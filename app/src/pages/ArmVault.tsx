@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { Shell } from "../components/Shell";
 import { Stamp } from "../components/Stamp";
 import { BackLink } from "../components/BackLink";
@@ -50,10 +50,15 @@ const TICKS: { n: Step; label: string }[] = [
 export function ArmVault() {
   const navigate = useNavigate();
   const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
   const { setVisible } = useWalletModal();
   const { program, hasSigner } = useProgram();
   const { pending, error, setError, run } = useTx();
   const existingFlag = useFlag("existing");
+  // ?fast=1 swaps the interval step from days→seconds for live-demo runs
+  // where the audience has to watch the countdown hit 0 in under 2 minutes.
+  // Off by default so the production wizard still talks about days.
+  const fast = useFlag("fast");
 
   // Banner shows if a switch already exists for this owner — detected on-chain,
   // or forced via ?existing=1 for design preview.
@@ -61,8 +66,13 @@ export function ArmVault() {
 
   const [step, setStep] = useState<Step>(1);
   const [beneficiary, setBeneficiary] = useState("");
-  const [intervalDays, setIntervalDays] = useState(30);
+  // In fast mode this is SECONDS; in normal mode it's DAYS. `intervalSeconds`
+  // below resolves the unit for downstream consumers.
+  const [intervalValue, setIntervalValue] = useState(fast ? 60 : 30);
+  const intervalSeconds = fast ? intervalValue : intervalValue * 86400;
+  const intervalLabel = fast ? fmtSeconds(intervalValue) : fmtInterval(intervalValue);
   const [amountSol, setAmountSol] = useState(5.0);
+  const [balanceSol, setBalanceSol] = useState<number | null>(null);
   const [reminder, setReminder] = useState<ReminderState>({
     emailEnabled: true,
     email: "",
@@ -90,6 +100,29 @@ export function ArmVault() {
     };
   }, [program, publicKey]);
 
+  // Poll the wallet balance so the amount step can show the real number + MAX.
+  useEffect(() => {
+    if (!publicKey) {
+      setBalanceSol(null);
+      return;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const lamports = await connection.getBalance(publicKey);
+        if (!cancelled) setBalanceSol(lamports / LAMPORTS_PER_SOL);
+      } catch {
+        if (!cancelled) setBalanceSol(null);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [connection, publicKey]);
+
   // Step 4 ARM IT → initialize() on-chain → step 5 (reminders)
   function armVault() {
     if (!hasSigner || !publicKey) {
@@ -108,7 +141,7 @@ export function ArmVault() {
         fnName: "initialize",
         sub: "wallet popup → confirm → vault PDA created → SwitchInitialized emitted",
       },
-      () => initialize(program, publicKey, benPk, intervalDays * 86400, amountSol),
+      () => initialize(program, publicKey, benPk, intervalSeconds, amountSol),
       () => setStep(5),
     );
   }
@@ -116,9 +149,13 @@ export function ArmVault() {
   function navigateToCockpit(withReminders: boolean) {
     const qs = new URLSearchParams({
       ben: beneficiary,
-      int: String(intervalDays),
+      // Cockpit fallback display only — once the on-chain account fetches it
+      // takes over. In fast mode we still send days for the static fallback
+      // (cockpit's pre-fetch label) but the real on-chain interval is seconds.
+      int: String(fast ? Math.max(1, Math.round(intervalSeconds / 86400)) : intervalValue),
       amt: String(amountSol),
     });
+    if (fast) qs.set("fast", "1");
     if (withReminders) {
       qs.set("rem", "1");
       qs.set("lead", String(reminder.leadSeconds));
@@ -234,7 +271,7 @@ export function ArmVault() {
             <Chip label="BENEFICIARY" value={shortAddr(beneficiary)} />
           )}
           {step > 2 && (
-            <Chip label="INTERVAL" value={fmtInterval(intervalDays)} />
+            <Chip label="INTERVAL" value={intervalLabel} />
           )}
           {step > 3 && (
             <Chip label="AMOUNT" value={`${amountSol.toFixed(2)} SOL`} />
@@ -252,8 +289,9 @@ export function ArmVault() {
         )}
         {step === 2 && (
           <StepInterval
-            days={intervalDays}
-            setDays={setIntervalDays}
+            value={intervalValue}
+            setValue={setIntervalValue}
+            fast={fast}
             onBack={() => setStep(1)}
             onNext={() => setStep(3)}
           />
@@ -262,6 +300,7 @@ export function ArmVault() {
           <StepAmount
             amount={amountSol}
             setAmount={setAmountSol}
+            balanceSol={balanceSol}
             onBack={() => setStep(2)}
             onNext={() => setStep(4)}
           />
@@ -269,7 +308,7 @@ export function ArmVault() {
         {step === 4 && (
           <StepOath
             beneficiary={beneficiary}
-            intervalDays={intervalDays}
+            intervalLabel={intervalLabel}
             amountSol={amountSol}
             onBack={() => setStep(3)}
             onArm={armVault}
@@ -395,16 +434,33 @@ function StepBeneficiary({
 }
 
 function StepInterval({
-  days,
-  setDays,
+  value,
+  setValue,
+  fast,
   onBack,
   onNext,
 }: {
-  days: number;
-  setDays: (d: number) => void;
+  value: number;
+  setValue: (n: number) => void;
+  fast: boolean;
   onBack: () => void;
   onNext: () => void;
 }) {
+  const unitLabel = fast ? "SECONDS" : "DAYS";
+  const presets = fast
+    ? [
+        { value: 30, label: "30s" },
+        { value: 60, label: "60s" },
+        { value: 120, label: "2m" },
+        { value: 300, label: "5m" },
+      ]
+    : [
+        { value: 1, label: "1 DAY" },
+        { value: 7, label: "7 DAYS" },
+        { value: 30, label: "30 DAYS" },
+        { value: 90, label: "90 DAYS" },
+        { value: 365, label: "1 YEAR" },
+      ];
   return (
     <section className="flex flex-col gap-6">
       <div>
@@ -416,6 +472,11 @@ function StepInterval({
         </h2>
         <p className="text-muted text-base mt-2.5">
           choose a check-in interval. you must check in before this elapses — otherwise the funds release.
+          {fast && (
+            <span className="block mt-1 text-amber">
+              ⚡ FAST MODE · interval is in SECONDS · for live-demo runs
+            </span>
+          )}
         </p>
       </div>
 
@@ -424,27 +485,21 @@ function StepInterval({
           size="mega"
           type="number"
           min={1}
-          value={days}
+          value={value}
           onKeyDown={(e) => {
             if (e.key === "Enter") onNext();
           }}
-          onChange={(e) => setDays(parseInt(e.target.value) || 0)}
+          onChange={(e) => setValue(parseInt(e.target.value) || 0)}
         />
         <div className="text-muted text-sm tracking-widest uppercase text-center mt-[-0.5rem]">
-          DAYS
+          {unitLabel}
         </div>
         <div className="flex justify-center mt-4">
           <PresetGroup
             ariaLabel="interval presets"
-            value={days}
-            onChange={setDays}
-            options={[
-              { value: 1, label: "1 DAY" },
-              { value: 7, label: "7 DAYS" },
-              { value: 30, label: "30 DAYS" },
-              { value: 90, label: "90 DAYS" },
-              { value: 365, label: "1 YEAR" },
-            ]}
+            value={value}
+            onChange={setValue}
+            options={presets}
           />
         </div>
       </div>
@@ -462,14 +517,20 @@ function StepInterval({
 function StepAmount({
   amount,
   setAmount,
+  balanceSol,
   onBack,
   onNext,
 }: {
   amount: number;
   setAmount: (n: number) => void;
+  balanceSol: number | null;
   onBack: () => void;
   onNext: () => void;
 }) {
+  // Keep a small reserve so MAX still leaves room for tx fees + future check_ins.
+  const RESERVE_SOL = 0.01;
+  const maxLockable =
+    balanceSol == null ? null : Math.max(0, balanceSol - RESERVE_SOL);
   return (
     <section className="flex flex-col gap-6">
       <div>
@@ -500,14 +561,19 @@ function StepAmount({
           SOL
         </div>
         <div className="text-center mt-4 text-xs text-muted">
-          wallet balance: <span className="text-green glow-green">12.40 SOL</span>
-          <button
-            type="button"
-            onClick={() => setAmount(12.39)}
-            className="ml-2 text-amber underline underline-offset-2 hover:text-amber-dim"
-          >
-            [ MAX ]
-          </button>
+          wallet balance:{" "}
+          <span className="text-green glow-green">
+            {balanceSol == null ? "…" : `${balanceSol.toFixed(2)} SOL`}
+          </span>
+          {maxLockable != null && maxLockable > 0 && (
+            <button
+              type="button"
+              onClick={() => setAmount(Number(maxLockable.toFixed(4)))}
+              className="ml-2 text-amber underline underline-offset-2 hover:text-amber-dim"
+            >
+              [ MAX ]
+            </button>
+          )}
         </div>
         <div className="flex justify-center mt-4">
           <PresetGroup
@@ -536,14 +602,14 @@ function StepAmount({
 
 function StepOath({
   beneficiary,
-  intervalDays,
+  intervalLabel,
   amountSol,
   onBack,
   onArm,
   connected,
 }: {
   beneficiary: string;
-  intervalDays: number;
+  intervalLabel: string;
   amountSol: number;
   onBack: () => void;
   onArm: () => void;
@@ -578,7 +644,7 @@ function StepOath({
           IF YOU DO NOT CHECK IN AT LEAST ONCE EVERY
         </div>
         <div className="text-5xl font-extrabold text-amber glow-amber my-1">
-          {fmtInterval(intervalDays)}
+          {intervalLabel}
         </div>
 
         <div className="text-base text-muted leading-loose mt-6">THE WALLET</div>
