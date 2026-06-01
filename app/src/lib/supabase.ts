@@ -1,7 +1,7 @@
 // Off-chain Supabase notifier — frontend contract.
 // Source of truth: supabase/SETUP.md (subscribe — frontend contract).
 
-const SUPABASE_BASE = "https://evwzkclqfjypefxglylc.supabase.co";
+const SUPABASE_BASE = "https://hoxktihicnmnsibovvei.supabase.co";
 
 export type SubscribeBody = {
   switch_pda: string;
