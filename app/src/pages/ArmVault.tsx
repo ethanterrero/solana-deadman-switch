@@ -761,7 +761,7 @@ function StepReminders({
           }
           input={
             <Field
-              placeholder="chat id (DM @deadman_switch_bot first)"
+              placeholder="chat id (DM @solswitch_bot first)"
               value={reminder.telegram}
               onChange={(e) => setReminder({ ...reminder, telegram: e.target.value })}
             />

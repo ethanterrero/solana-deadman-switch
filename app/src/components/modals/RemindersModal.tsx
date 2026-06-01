@@ -110,7 +110,7 @@ export function RemindersModal({ open, onClose, subscription, onSave, onDisable 
           }
           input={
             <Field
-              placeholder="chat id (DM @deadman_switch_bot first)"
+              placeholder="chat id (DM @solswitch_bot first)"
               value={draft.telegram}
               disabled={!draft.telegramEnabled}
               onChange={(e) => setDraft({ ...draft, telegram: e.target.value })}
