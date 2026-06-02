@@ -21,22 +21,38 @@ solana airdrop 2 <OWNER_PUBKEY> --url devnet
 solana airdrop 0.05 <BENEFICIARY_PUBKEY> --url devnet
 ```
 
+## RPC endpoint · don't trust the public faucet RPC
+
+The app reads `VITE_RPC_URL` from `app/.env.local`. For the live demo, point it at a dedicated devnet endpoint (Helius) so a rate-limited public RPC can't stall a tx mid-stage.
+
+- [ ] `app/.env.local` exists with `VITE_RPC_URL=https://devnet.helius-rpc.com/?api-key=...`
+- [ ] **Restart `npm run dev`** after creating/editing `.env.local` (Vite only reads env at startup)
+- [ ] Sanity check it's live: open the app, connect Phantom, the WalletPill shows a real SOL balance (proves the RPC answers)
+- [ ] Use the same endpoint in the scripts below: `export RPC_URL=https://devnet.helius-rpc.com/?api-key=...`
+
 ## On-chain state · no leftover switch
 
-The PDA is seeded on `("switch", owner.pubkey)`. If a previous switch already occupies it, the new `initialize` will fail with **already in use**.
+The PDA is seeded on `("switch", owner.pubkey)`. If a previous switch already occupies it, the new `initialize` fails with **already in use**.
 
-- [ ] Run the seed script in cancel-only mode, OR open `/cockpit` and click **CANCEL** if a switch exists, OR run:
+Two reset paths — know which applies:
+
+- **Live-arm rehearsal** (you ARM through the app with Phantom): the switch is owned by your **Phantom OWNER**. Reset it with the **CANCEL** button in `/cockpit`, or just let a successful **claim** close it (claim drains + closes the PDA, freeing the slot automatically). The CLI seed script can't reset this one — it can't sign as your Phantom owner.
+- **Check state any time** (read-only, no signing):
   ```
   cd /Users/ethanterrero/Desktop/solana-deadman-switch
-  ANCHOR_PROVIDER_URL=https://api.devnet.solana.com \
-  ANCHOR_WALLET=$HOME/.config/solana/id.json \
-    INTERVAL_SECONDS=30 \
-    BENEFICIARY_PUBKEY=<BENEFICIARY_PUBKEY> \
-    AMOUNT_SOL=0.01 \
-    npx ts-mocha -p ./tsconfig.json -t 1000000 scripts/seed-switch-devnet.ts
+  OWNER_PUBKEY=<PHANTOM_OWNER_PUBKEY> node app/scripts/switch-state.mjs
   ```
-  (Re-seed afterward via the same command between rehearsals so the next run starts clean.)
-- [ ] Confirm with `solana account <SWITCH_PDA> --url devnet` — should say "AccountNotFound" before you start the live demo (since the wizard will create it).
+  Want "no switch (PDA empty)" before a fresh live ARM.
+
+- **"Cut to the bone" fallback** (skip arming — pre-seed a claimable switch owned by the CLI wallet, claim with Phantom B): run once, then it's claimable after the interval elapses.
+  ```
+  cd /Users/ethanterrero/Desktop/solana-deadman-switch
+  BENEFICIARY_PUBKEY=<PHANTOM_BENEFICIARY_PUBKEY> \
+  INTERVAL_SECONDS=30 AMOUNT_SOL=0.1 \
+  RPC_URL=$RPC_URL \
+    node app/scripts/seed-switch.mjs
+  ```
+  Requires the CLI wallet (`9a95…X6MK`, `~/.config/solana/id.json`) funded with ≥ ~0.2 devnet SOL. In the app, go to `/watch`, look up the owner it prints, and CLAIM with Phantom B once the countdown hits 0.
 
 ## Dev server · already running
 
