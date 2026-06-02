@@ -37,22 +37,23 @@ The PDA is seeded on `("switch", owner.pubkey)`. If a previous switch already oc
 Two reset paths — know which applies:
 
 - **Live-arm rehearsal** (you ARM through the app with Phantom): the switch is owned by your **Phantom OWNER**. Reset it with the **CANCEL** button in `/cockpit`, or just let a successful **claim** close it (claim drains + closes the PDA, freeing the slot automatically). The CLI seed script can't reset this one — it can't sign as your Phantom owner.
-- **Check state any time** (read-only, no signing):
+- **Check state any time** (read-only, no signing) — pubkeys for this demo are filled in:
   ```
   cd /Users/ethanterrero/Desktop/solana-deadman-switch
-  OWNER_PUBKEY=<PHANTOM_OWNER_PUBKEY> node app/scripts/switch-state.mjs
+  OWNER_PUBKEY=Eb6xhpdfrUPnxtWT63oZRoCVt2XSNRibLhn8k8iqpiwL node app/scripts/switch-state.mjs
   ```
   Want "no switch (PDA empty)" before a fresh live ARM.
+  (`Eb6x…piwL` = Phantom OWNER; `F7rHtd…w283` = Phantom BENEFICIARY.)
 
 - **"Cut to the bone" fallback** (skip arming — pre-seed a claimable switch owned by the CLI wallet, claim with Phantom B): run once, then it's claimable after the interval elapses.
   ```
   cd /Users/ethanterrero/Desktop/solana-deadman-switch
-  BENEFICIARY_PUBKEY=<PHANTOM_BENEFICIARY_PUBKEY> \
+  BENEFICIARY_PUBKEY=F7rHtdGgadx4QZT9NNwdoFjamnXQqBTCCpkeH8w8m283 \
   INTERVAL_SECONDS=30 AMOUNT_SOL=0.1 \
   RPC_URL=$RPC_URL \
     node app/scripts/seed-switch.mjs
   ```
-  Requires the CLI wallet (`9a95…X6MK`, `~/.config/solana/id.json`) funded with ≥ ~0.2 devnet SOL. In the app, go to `/watch`, look up the owner it prints, and CLAIM with Phantom B once the countdown hits 0.
+  Requires the CLI wallet (`9a95…X6MK`, `~/.config/solana/id.json`) funded with ≥ ~0.2 devnet SOL (the OWNER Phantom funding does NOT cover this — separate wallet). In the app, go to `/watch`, look up the owner it prints (`9a95…`), and CLAIM with Phantom B once the countdown hits 0.
 
 ## Dev server · already running
 
