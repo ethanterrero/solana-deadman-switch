@@ -55,10 +55,12 @@ export function ArmVault() {
   const { program, hasSigner } = useProgram();
   const { pending, error, setError, run } = useTx();
   const existingFlag = useFlag("existing");
-  // ?fast=1 swaps the interval step from days→seconds for live-demo runs
+  // Fast mode swaps the interval step from days→seconds for live-demo runs
   // where the audience has to watch the countdown hit 0 in under 2 minutes.
+  // Enabled by `?fast=1` OR `VITE_FAST=1` in .env.local. The env switch makes
+  // the whole local demo build fast so `/identify` can't strip the URL flag.
   // Off by default so the production wizard still talks about days.
-  const fast = useFlag("fast");
+  const fast = useFlag("fast") || import.meta.env.VITE_FAST === "1";
 
   // Banner shows if a switch already exists for this owner — detected on-chain,
   // or forced via ?existing=1 for design preview.
