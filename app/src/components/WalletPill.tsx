@@ -1,8 +1,9 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 import { useEffect, useState } from "react";
 import { shortAddr } from "../lib/format";
+import { RPC_ENDPOINT } from "../lib/rpc";
 
 interface Props {
   role?: "OWNER" | "BENEFICIARY";
@@ -22,7 +23,7 @@ export function WalletPill({ role }: Props) {
       setBalanceSol(null);
       return;
     }
-    const conn = new Connection(clusterApiUrl("devnet"), "confirmed");
+    const conn = new Connection(RPC_ENDPOINT, "confirmed");
     let cancelled = false;
     const fetchBalance = async () => {
       try {
