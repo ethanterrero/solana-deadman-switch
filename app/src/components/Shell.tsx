@@ -15,7 +15,8 @@ export function Shell({ state, bodyClass, children }: ShellProps) {
     const body = document.body;
     const stateClasses = [
       "state-active", "state-warning", "state-critical", "state-expired",
-      "state-empty", "state-watching", "state-nearing", "state-claimable", "state-claimed",
+      "state-empty", "state-watching", "state-nearing", "state-claimable", "state-challenge",
+      "state-finalizable", "state-claimed",
     ];
     stateClasses.forEach((c) => body.classList.remove(c));
     if (state) body.classList.add(`state-${state}`);

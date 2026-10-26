@@ -1,7 +1,22 @@
 import { BN } from "@coral-xyz/anchor";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
 import type { DmProgram } from "../hooks/useProgram";
+import idl from "../idl/deadman_switch.json";
 import { deriveSwitchPda } from "./pda";
+
+// Program bounds, read from the IDL so the UI matches whichever build
+// (release or `demo`) is deployed.
+function idlConstant(name: string): number {
+  const c = (idl as { constants?: { name: string; value: string }[] }).constants?.find(
+    (k) => k.name === name,
+  );
+  if (!c) throw new Error(`IDL is missing constant ${name}`);
+  return Number(c.value.replace(/_/g, ""));
+}
+
+export const MIN_INTERVAL_SECS = idlConstant("MIN_INTERVAL");
+export const MAX_INTERVAL_SECS = idlConstant("MAX_INTERVAL");
+export const CHALLENGE_PERIOD_SECS = idlConstant("CHALLENGE_PERIOD");
 
 /** Decoded `Switch` account (camelCase, as Anchor returns it). */
 export interface SwitchAccount {
@@ -11,6 +26,7 @@ export interface SwitchAccount {
   interval: BN;
   amount: BN;
   bump: number;
+  claimStartedAt: BN;
 }
 
 /** UI-friendly view derived from a raw `SwitchAccount`. */
@@ -22,11 +38,16 @@ export interface SwitchView {
   intervalDays: number;
   lastCheckinMs: number;
   unlockAtMs: number;
+  /** When the beneficiary started a claim; null if none is pending. */
+  claimStartedMs: number | null;
+  /** When a pending claim can be finished; null if none is pending. */
+  claimableAtMs: number | null;
 }
 
 export function toView(s: SwitchAccount): SwitchView {
   const intervalSecs = s.interval.toNumber();
   const lastCheckinMs = s.lastCheckin.toNumber() * 1000;
+  const claimStartedMs = s.claimStartedAt.isZero() ? null : s.claimStartedAt.toNumber() * 1000;
   return {
     owner: s.owner.toBase58(),
     beneficiary: s.beneficiary.toBase58(),
@@ -35,6 +56,8 @@ export function toView(s: SwitchAccount): SwitchView {
     intervalDays: Math.round(intervalSecs / 86400),
     lastCheckinMs,
     unlockAtMs: lastCheckinMs + intervalSecs * 1000,
+    claimStartedMs,
+    claimableAtMs: claimStartedMs == null ? null : claimStartedMs + CHALLENGE_PERIOD_SECS * 1000,
   };
 }
 
@@ -49,6 +72,21 @@ export async function fetchSwitch(
   } catch {
     return null;
   }
+}
+
+/**
+ * Find every switch naming `beneficiary` as heir. The beneficiary pubkey sits
+ * right after the 8-byte discriminator and 32-byte owner, so a memcmp filter
+ * at offset 40 lets the RPC do the search.
+ */
+export async function fetchSwitchesForBeneficiary(
+  program: DmProgram,
+  beneficiary: PublicKey,
+): Promise<SwitchAccount[]> {
+  const found = await program.account.switch.all([
+    { memcmp: { offset: 8 + 32, bytes: beneficiary.toBase58() } },
+  ]);
+  return found.map((f) => f.account as unknown as SwitchAccount);
 }
 
 // ---- Instructions ----------------------------------------------------------
@@ -114,9 +152,22 @@ export function cancel(program: DmProgram, owner: PublicKey): Promise<string> {
 }
 
 /**
- * `claim` is signed by the beneficiary, but the PDA is seeded on the *owner*.
- * The beneficiary supplies the owner's address (they looked the vault up by it).
+ * `start_claim` and `claim` are signed by the beneficiary, but the PDA is
+ * seeded on the *owner*, so the caller passes the owner's address.
+ * `start_claim` opens the owner's challenge window; `claim` finishes it.
  */
+export function startClaim(
+  program: DmProgram,
+  ownerPubkey: PublicKey,
+  beneficiary: PublicKey,
+): Promise<string> {
+  const [switchPda] = deriveSwitchPda(ownerPubkey);
+  return program.methods
+    .startClaim()
+    .accountsPartial({ switch: switchPda, beneficiary })
+    .rpc();
+}
+
 export function claim(
   program: DmProgram,
   ownerPubkey: PublicKey,
@@ -142,6 +193,10 @@ export function txErrorMessage(e: unknown): string {
   if (any?.error?.errorMessage) return any.error.errorMessage;
   // Common program guards, matched from logs/message as a fallback
   if (/StillActive/i.test(raw)) return "Still active — the interval hasn't elapsed yet";
+  if (/ChallengeWindowOpen/i.test(raw)) return "The owner's challenge window is still open";
+  if (/ClaimNotStarted/i.test(raw)) return "No claim is pending — start one first";
+  if (/ClaimAlreadyStarted/i.test(raw)) return "A claim is already pending";
+  if (/InvalidInterval/i.test(raw)) return "Interval is outside the allowed range";
   if (/Unauthorized/i.test(raw)) return "This wallet isn't authorized for that action";
   if (/insufficient/i.test(raw)) return "Insufficient SOL for this transaction";
   if (/already in use|already exists/i.test(raw)) return "A vault already exists for this wallet";

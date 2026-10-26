@@ -17,6 +17,7 @@ import { useTx } from "../hooks/useTx";
 import { useCountdown } from "../hooks/useCountdown";
 import { fmtSeconds, fmtUtc, shortAddr } from "../lib/format";
 import {
+  CHALLENGE_PERIOD_SECS,
   cancel as cancelIx,
   checkIn as checkInIx,
   deposit as depositIx,
@@ -86,8 +87,11 @@ export function Cockpit() {
     return v;
   }, [program, publicKey]);
 
+  // Poll so a claim the beneficiary starts shows up without a reload.
   useEffect(() => {
     void refetch();
+    const id = setInterval(() => void refetch(), 15_000);
+    return () => clearInterval(id);
   }, [refetch]);
 
   // Displayed values prefer real chain data, fall back to the wizard handoff.
@@ -102,6 +106,7 @@ export function Cockpit() {
 
   // ?demo=1 lets the presenter override remaining time for rehearsal.
   const [previewRemaining, setPreviewRemaining] = useState<number | null>(null);
+  const [previewClaimableAt, setPreviewClaimableAt] = useState<number | null>(null);
   const realUnlockMs = view?.unlockAtMs ?? lastCheckinMs + intervalDays * 86400 * 1000;
   const effectiveUnlock = useMemo(
     () => (previewRemaining == null ? realUnlockMs : Date.now() + previewRemaining * 1000),
@@ -111,6 +116,10 @@ export function Cockpit() {
   // Status is derived from the live countdown (real or demo-overridden).
   const { remainingSec } = useCountdown(effectiveUnlock, 1000);
   const state = statusFromRemaining(remainingSec);
+  // The beneficiary started a claim; a check-in now vetoes it.
+  const claimableAtMs =
+    previewRemaining == null ? view?.claimableAtMs ?? null : previewClaimableAt;
+  const claimPending = claimableAtMs != null;
 
   // reminders
   const [sub, setSub] = useState<ReminderSub>({
@@ -176,7 +185,11 @@ export function Cockpit() {
       () => checkInIx(program, owner),
       async (sig) => {
         setPreviewRemaining(null);
+        setPreviewClaimableAt(null);
         await refetch();
+        if (claimPending) {
+          pushEvent({ kind: "ClaimVetoed", meta: "pending claim cancelled", sig: shortAddr(sig), when: "just now", color: "amber" });
+        }
         pushEvent({ kind: "CheckedIn", meta: "last_checkin reset", sig: shortAddr(sig), when: "just now", color: "green" });
       },
     );
@@ -287,6 +300,7 @@ export function Cockpit() {
       else if (demo && e.key === "2") setPreviewState("warning");
       else if (demo && e.key === "3") setPreviewState("critical");
       else if (demo && e.key === "4") setPreviewState("expired");
+      else if (demo && e.key === "5") previewClaimPending();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -295,6 +309,7 @@ export function Cockpit() {
 
   // Demo override — sets a synthetic remaining time; `state` re-derives from it.
   function setPreviewState(s: CockpitState) {
+    setPreviewClaimableAt(null);
     switch (s) {
       case "active":
         setPreviewRemaining(11 * 86400 + 23 * 3600 + 47 * 60 + 12);
@@ -311,7 +326,13 @@ export function Cockpit() {
     }
   }
 
+  function previewClaimPending() {
+    setPreviewRemaining(0);
+    setPreviewClaimableAt(Date.now() + CHALLENGE_PERIOD_SECS * 1000);
+  }
+
   const statusInfo = useMemo(() => {
+    if (claimPending) return { text: "CLAIM PENDING · VETO NOW", sub: "check in to cancel it" };
     switch (state) {
       case "active":
         return { text: "ARMED · LOCKED", sub: "vault is watching" };
@@ -320,9 +341,9 @@ export function Cockpit() {
       case "critical":
         return { text: "CRITICAL · CHECK IN NOW", sub: "danger zone" };
       case "expired":
-        return { text: "EXPIRED · BENEFICIARY CAN CLAIM", sub: "race in progress" };
+        return { text: "EXPIRED · BENEFICIARY CAN START A CLAIM", sub: "check in to reset" };
     }
-  }, [state]);
+  }, [state, claimPending]);
 
   return (
     <Shell state={state} bodyClass={demo ? "demo-mode" : undefined}>
@@ -356,7 +377,7 @@ export function Cockpit() {
                 key={s}
                 onClick={() => setPreviewState(s)}
                 className={`font-mono text-[0.65rem] tracking-[0.18em] uppercase px-2.5 py-1.5 border transition-all ${
-                  state === s
+                  state === s && !claimPending
                     ? "bg-panel-2 border-[var(--status)] text-[var(--status)]"
                     : "border-transparent text-muted hover:text-text"
                 }`}
@@ -364,6 +385,16 @@ export function Cockpit() {
                 {s === "warning" ? "WARN <24h" : s === "critical" ? "CRIT <1m" : s.toUpperCase()}
               </button>
             ))}
+            <button
+              onClick={previewClaimPending}
+              className={`font-mono text-[0.65rem] tracking-[0.18em] uppercase px-2.5 py-1.5 border transition-all ${
+                claimPending
+                  ? "bg-panel-2 border-[var(--status)] text-[var(--status)]"
+                  : "border-transparent text-muted hover:text-text"
+              }`}
+            >
+              CLAIM PENDING
+            </button>
           </div>
         )}
       </header>
@@ -392,19 +423,36 @@ export function Cockpit() {
           </span>
         </div>
 
-        {/* Expired banner */}
-        {state === "expired" && (
+        {/* Pending-claim banner */}
+        {claimPending && (
           <div className="bg-red/[.12] border border-red px-5 py-4.5 mb-6">
             <div className="flex items-center gap-3 mb-1">
               <span className="text-red text-lg">⚠</span>
-              <Stamp tone="red">BENEFICIARY CAN CLAIM NOW</Stamp>
+              <Stamp tone="red">YOUR BENEFICIARY STARTED A CLAIM</Stamp>
+            </div>
+            <p className="text-sm text-text mt-2 leading-relaxed">
+              the wallet{" "}
+              <span className="text-red font-semibold">{shortAddr(beneficiary)}</span>{" "}
+              started a claim. if you're still here, check in before{" "}
+              <span className="font-semibold">{fmtUtc(claimableAtMs)}</span> to veto
+              it. after that, they can take the funds.
+            </p>
+          </div>
+        )}
+
+        {/* Expired banner */}
+        {state === "expired" && !claimPending && (
+          <div className="bg-red/[.12] border border-red px-5 py-4.5 mb-6">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-red text-lg">⚠</span>
+              <Stamp tone="red">BENEFICIARY CAN START A CLAIM</Stamp>
             </div>
             <p className="text-sm text-text mt-2 leading-relaxed">
               your interval elapsed. the wallet{" "}
               <span className="text-red font-semibold">{shortAddr(beneficiary)}</span>{" "}
-              can now broadcast a claim() tx and take the funds. you can still
-              check in to reset the timer —{" "}
-              <span className="font-semibold">but you're in a race.</span>
+              can now start a claim. you'd then have{" "}
+              <span className="font-semibold">{fmtSeconds(CHALLENGE_PERIOD_SECS)}</span>{" "}
+              to veto it by checking in — or check in now to reset the timer.
             </p>
           </div>
         )}
@@ -419,15 +467,15 @@ export function Cockpit() {
         </div>
 
         <Stamp className="block text-center mb-3">
-          {state === "expired" ? "OVERDUE BY" : "UNLOCKS IN"}
+          {claimPending ? "VETO WINDOW CLOSES IN" : state === "expired" ? "OVERDUE BY" : "UNLOCKS IN"}
         </Stamp>
 
-        <Countdown unlockAtMs={effectiveUnlock} />
+        <Countdown unlockAtMs={claimableAtMs ?? effectiveUnlock} />
 
         <div className="text-center mt-6 text-sm text-muted">
-          next deadline ·{" "}
+          {claimPending ? "veto deadline" : "next deadline"} ·{" "}
           <span className="font-semibold" style={{ color: "var(--status)" }}>
-            {fmtUtc(effectiveUnlock)}
+            {fmtUtc(claimableAtMs ?? effectiveUnlock)}
           </span>
         </div>
 
@@ -445,11 +493,15 @@ export function Cockpit() {
           >
             <span className="absolute top-[-10px] left-[-10px] w-3.5 h-3.5 border-t-2 border-l-2 border-green" />
             <span className="absolute bottom-[-10px] right-[-10px] w-3.5 h-3.5 border-b-2 border-r-2 border-green" />
-            <span>{state === "expired" ? "▶ RACE TO CHECK IN" : "◆ CHECK IN"}</span>
+            <span>
+              {claimPending ? "▶ VETO · CHECK IN" : state === "expired" ? "▶ CHECK IN NOW" : "◆ CHECK IN"}
+            </span>
             <span className="text-xs tracking-[0.25em] font-medium text-muted">
-              {state === "expired"
-                ? "beneficiary can claim now — be first"
-                : "reset the timer · 1 tx"}
+              {claimPending
+                ? "cancels the pending claim · 1 tx"
+                : state === "expired"
+                  ? "beneficiary can start a claim"
+                  : "reset the timer · 1 tx"}
             </span>
           </button>
         </div>

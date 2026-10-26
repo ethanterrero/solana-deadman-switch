@@ -28,7 +28,7 @@ npm run dev
 | `/identify` | `Identify` | OWNER / BENEFICIARY role select |
 | `/arm` | `ArmVault` | 5-step wizard (beneficiary → interval → amount → oath → reminders) |
 | `/cockpit` | `Cockpit` | active vault: countdown + CHECK_IN + deposit/edit/reminders/cancel modals |
-| `/watch` | `WatchClaim` | beneficiary watch + claim (empty → watching → nearing → claimable → claimed) |
+| `/watch` | `WatchClaim` | beneficiary lookup, watch + two-phase claim (empty → watching → nearing → claimable → challenge → finalizable → claimed) |
 
 ## Demo flags
 
@@ -41,12 +41,16 @@ npm run dev
 - Wallet adapter (Phantom, Solflare); WalletPill polls live SOL balance every 15s
 - Typed Anchor client — `useProgram()` builds `Program<DeadmanSwitch>` from the
   connected wallet (read-only stand-in before connect so account fetches work).
-- **All six instructions** via `src/lib/anchor.ts`:
-  `initialize`, `check_in`, `deposit`, `update_config`, `claim`, `cancel` —
-  each sends a real tx and the cockpit refetches the `Switch` account after.
+- **All seven instructions** via `src/lib/anchor.ts`:
+  `initialize`, `check_in`, `deposit`, `update_config`, `start_claim`, `claim`,
+  `cancel` — each sends a real tx and the screen refetches the `Switch` account after.
 - **Switch account fetch + decode** — the cockpit derives its countdown/status
-  from the real `last_checkin + interval`; the beneficiary screen looks a vault
-  up by owner address (`getAccountInfo` on the PDA).
+  from the real `last_checkin + interval`, polls every 15s, and shows a veto
+  banner when a claim is pending. The beneficiary screen lists every vault naming
+  the connected wallet (`getProgramAccounts` + `memcmp` at offset 40) and still
+  accepts a pasted owner address.
+- **Program bounds** — `MIN_INTERVAL`, `MAX_INTERVAL` and `CHALLENGE_PERIOD` come
+  from the IDL's `constants`, so the wizard and edit modal match the deployed build.
 - **Supabase `subscribe` POST** — wizard step 5 + the cockpit reminders modal
   hit `/functions/v1/subscribe` for real.
 - Write actions gate on a connected signer (open the wallet modal if absent);
