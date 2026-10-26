@@ -50,14 +50,14 @@ describe("seed devnet switch", () => {
     if (existing) {
       await program.methods
         .cancel()
-        .accounts({ switch: pda, owner })
+        .accountsPartial({ switch: pda, owner })
         .rpc();
       console.log("  cancelled pre-existing switch on this PDA");
     }
 
     const sig = await program.methods
       .initialize(beneficiary, new anchor.BN(INTERVAL), new anchor.BN(amountLamports))
-      .accounts({ switch: pda, owner })
+      .accountsPartial({ switch: pda, owner })
       .rpc();
 
     const acct = await program.account.switch.fetch(pda);

@@ -35,12 +35,13 @@ The wizard URL you'll navigate to is `/arm?fast=1` — that flag switches the in
 | **1:05** | (still cockpit) | **Cmd-click the address pill** to copy owner pubkey, then `Cmd-Tab` (or click) to **Tab 2** | "Now I switch hats. Beneficiary's view." |
 | **1:10** | Tab 2 · `/watch` empty state | `Cmd-V` owner pubkey · click **LOOK UP** | (paste, click) |
 | **1:15** | `/watch` watching mode — same countdown, NO claim button | (point) | "Same vault, beneficiary's side. Critically — there's no claim button yet. The program **rejects** any claim before the time gate." |
-| **1:25** | Countdown hits 0 → screen flashes → **CLAIMABLE** | (let it land) | "There. Time gate satisfied." |
-| **1:28** | CLAIM button visible | Open Phantom · switch to **BENEFICIARY** account · click **CLAIM** | "And now — only now — the beneficiary can claim." |
-| **1:32** | Phantom popup — `claim` | Approve | "Claim runs the same time check on-chain. If the clock weren't past, this would revert." |
-| **1:38** | claimed screen — green confirmation, vault drained | (smile) | "Vault closed. 0.1 SOL moved. No human in the loop. Just code, and time." |
+| **1:25** | Countdown hits 0 → screen flashes → **START CLAIM** | (let it land) | "There. Time gate satisfied." |
+| **1:28** | START CLAIM button visible | Open Phantom · switch to **BENEFICIARY** account · click **START CLAIM** | "The beneficiary can't take the funds yet. They start a claim, and that opens a challenge window." |
+| **1:32** | Phantom popup — `start_claim` → 10s challenge countdown | Approve | "If I'm actually alive, one check-in during this window vetoes the claim. On mainnet the window is seven days." |
+| **1:42** | Window closes → **CLAIM 0.10 SOL** | Click **CLAIM** · approve in Phantom | "No veto. Now the funds move." |
+| **1:48** | claimed screen — green confirmation, vault drained | (smile) | "Vault closed. 0.1 SOL moved. No human in the loop. Just code, and time." |
 
-End: ~1:40. Buffer 20s.
+End: ~1:50. Buffer 10s.
 
 ---
 

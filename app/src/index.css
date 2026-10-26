@@ -79,10 +79,13 @@ body.state-empty    { --status: var(--green);  --status-glow: rgba(0,255,136,.35
 body.state-watching { --status: var(--violet); --status-glow: rgba(167,139,250,.45);  --tick-speed: 2400ms; }
 body.state-nearing  { --status: var(--violet); --status-glow: rgba(167,139,250,.6);   --tick-speed: 1200ms; }
 body.state-claimable { --status: var(--green);  --status-glow: rgba(0,255,136,.6);     --tick-speed: 800ms; }
+body.state-challenge { --status: var(--amber);  --status-glow: rgba(255,176,32,.5);    --tick-speed: 1200ms; }
+body.state-finalizable { --status: var(--green); --status-glow: rgba(0,255,136,.6);    --tick-speed: 800ms; }
 body.state-claimed  { --status: var(--green-dim); --status-glow: rgba(0,170,90,.35); }
 
 /* Vignette on intense states */
-body.state-critical::after, body.state-expired::after, body.state-claimable::after {
+body.state-critical::after, body.state-expired::after, body.state-claimable::after,
+body.state-finalizable::after {
   content: "";
   position: fixed;
   inset: 0;

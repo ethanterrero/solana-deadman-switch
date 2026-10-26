@@ -5,7 +5,9 @@
 //   npx ts-mocha -p ./tsconfig.json -t 1000000 scripts/smoke-devnet.ts
 //
 // The owner wallet (provider) pays all fees, so the ephemeral beneficiary
-// needs no SOL — it only signs the claim and receives the closed PDA's lamports.
+// needs no SOL — it only signs start_claim/claim and receives the closed PDA's
+// lamports. Expects the devnet program to be a `demo`-feature build
+// (MIN_INTERVAL = 5s, CHALLENGE_PERIOD = 10s).
 import * as anchor from "@anchor-lang/core";
 import { Program } from "@anchor-lang/core";
 import { DeadmanSwitch } from "../target/types/deadman_switch";
@@ -21,9 +23,10 @@ describe("devnet smoke", () => {
   const connection = provider.connection;
 
   const INTERVAL = 10;
+  const CHALLENGE = 10;
   const AMOUNT = 0.02 * anchor.web3.LAMPORTS_PER_SOL;
 
-  it("init -> check_in -> claim blocked -> wait -> claim (on devnet)", async () => {
+  it("init -> check_in -> start_claim blocked -> wait -> start_claim -> challenge -> claim (on devnet)", async () => {
     const owner = provider.wallet.publicKey;
     const beneficiary = anchor.web3.Keypair.generate();
     const pda = anchor.web3.PublicKey.findProgramAddressSync(
@@ -38,7 +41,7 @@ describe("devnet smoke", () => {
 
     const initSig = await program.methods
       .initialize(beneficiary.publicKey, new anchor.BN(INTERVAL), new anchor.BN(AMOUNT))
-      .accounts({ switch: pda, owner })
+      .accountsPartial({ switch: pda, owner })
       .rpc();
     console.log("  initialize: ", ex(initSig));
 
@@ -49,31 +52,40 @@ describe("devnet smoke", () => {
 
     const checkSig = await program.methods
       .checkIn()
-      .accounts({ switch: pda, owner })
+      .accountsPartial({ switch: pda, owner })
       .rpc();
     console.log("  check_in:   ", ex(checkSig));
 
-    // Claim before the interval -> StillActive.
-    let blocked = false;
-    try {
-      await program.methods
-        .claim()
-        .accounts({ switch: pda, beneficiary: beneficiary.publicKey })
+    const startClaim = () =>
+      program.methods
+        .startClaim()
+        .accountsPartial({ switch: pda, beneficiary: beneficiary.publicKey })
         .signers([beneficiary])
         .rpc();
+
+    // start_claim before the interval -> StillActive.
+    let blocked = false;
+    try {
+      await startClaim();
     } catch (e) {
       blocked = e.toString().includes("StillActive");
     }
-    assert.ok(blocked, "claim should be blocked with StillActive before the interval");
-    console.log("  claim (early): correctly reverted with StillActive");
+    assert.ok(blocked, "start_claim should be blocked with StillActive before the interval");
+    console.log("  start_claim (early): correctly reverted with StillActive");
 
     console.log(`  waiting ${INTERVAL + 4}s for the interval to elapse...`);
     await sleep((INTERVAL + 4) * 1000);
 
+    const startSig = await startClaim();
+    console.log("  start_claim:", ex(startSig));
+
+    console.log(`  waiting ${CHALLENGE + 4}s for the challenge window to close...`);
+    await sleep((CHALLENGE + 4) * 1000);
+
     const benBefore = await connection.getBalance(beneficiary.publicKey);
     const claimSig = await program.methods
       .claim()
-      .accounts({ switch: pda, beneficiary: beneficiary.publicKey })
+      .accountsPartial({ switch: pda, beneficiary: beneficiary.publicKey })
       .signers([beneficiary])
       .rpc();
     console.log("  claim:      ", ex(claimSig));

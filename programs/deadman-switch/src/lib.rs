@@ -3,6 +3,30 @@ use anchor_lang::system_program;
 
 declare_id!("6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu");
 
+// Release builds use real-world bounds. The `demo` feature shrinks them to
+// seconds so local tests and live demos can run the full lifecycle. Values are
+// plain literals so the IDL carries numbers the frontend can read.
+
+/// Shortest allowed check-in interval, in seconds.
+#[cfg(not(feature = "demo"))]
+#[constant]
+pub const MIN_INTERVAL: i64 = 2_592_000; // 30 days
+#[cfg(feature = "demo")]
+#[constant]
+pub const MIN_INTERVAL: i64 = 5;
+
+/// Longest allowed check-in interval, in seconds.
+#[constant]
+pub const MAX_INTERVAL: i64 = 315_360_000; // 10 years
+
+/// How long the owner has to veto a started claim, in seconds.
+#[cfg(not(feature = "demo"))]
+#[constant]
+pub const CHALLENGE_PERIOD: i64 = 604_800; // 7 days
+#[cfg(feature = "demo")]
+#[constant]
+pub const CHALLENGE_PERIOD: i64 = 10;
+
 #[program]
 pub mod deadman_switch {
     use super::*;
@@ -13,7 +37,7 @@ pub mod deadman_switch {
         interval: i64,
         amount: u64,
     ) -> Result<()> {
-        require!(interval > 0, SwitchError::InvalidInterval);
+        validate_interval(interval)?;
         require!(amount > 0, SwitchError::InvalidAmount);
         require_keys_neq!(
             beneficiary,
@@ -41,6 +65,7 @@ pub mod deadman_switch {
         switch.interval = interval;
         switch.amount = amount;
         switch.bump = ctx.bumps.switch;
+        switch.claim_started_at = 0;
 
         emit!(SwitchInitialized {
             owner: switch.owner,
@@ -56,6 +81,7 @@ pub mod deadman_switch {
         let now = Clock::get()?.unix_timestamp;
         let switch = &mut ctx.accounts.switch;
         switch.last_checkin = now;
+        veto_pending_claim(switch);
 
         emit!(CheckedIn {
             owner: switch.owner,
@@ -102,9 +128,11 @@ pub mod deadman_switch {
             switch.beneficiary = beneficiary;
         }
         if let Some(interval) = new_interval {
-            require!(interval > 0, SwitchError::InvalidInterval);
+            validate_interval(interval)?;
             switch.interval = interval;
         }
+        // Any owner-signed change proves the owner is alive.
+        veto_pending_claim(switch);
 
         emit!(ConfigUpdated {
             owner: switch.owner,
@@ -114,12 +142,38 @@ pub mod deadman_switch {
         Ok(())
     }
 
+    /// Phase one: once the owner misses their deadline, the beneficiary starts
+    /// a claim. This opens a challenge window during which any check-in vetoes it.
+    pub fn start_claim(ctx: Context<StartClaim>) -> Result<()> {
+        let switch = &mut ctx.accounts.switch;
+        let now = Clock::get()?.unix_timestamp;
+        require!(switch.claim_started_at == 0, SwitchError::ClaimAlreadyStarted);
+        let deadline = switch
+            .last_checkin
+            .checked_add(switch.interval)
+            .ok_or(SwitchError::InvalidInterval)?;
+        require!(now >= deadline, SwitchError::StillActive);
+
+        switch.claim_started_at = now;
+
+        emit!(ClaimStarted {
+            owner: switch.owner,
+            beneficiary: switch.beneficiary,
+            claim_started_at: now,
+            claimable_at: now + CHALLENGE_PERIOD,
+        });
+        Ok(())
+    }
+
+    /// Phase two: after the challenge window passes without a veto, the
+    /// beneficiary receives the vault.
     pub fn claim(ctx: Context<Claim>) -> Result<()> {
         let switch = &ctx.accounts.switch;
         let now = Clock::get()?.unix_timestamp;
+        require!(switch.claim_started_at != 0, SwitchError::ClaimNotStarted);
         require!(
-            now >= switch.last_checkin + switch.interval,
-            SwitchError::StillActive
+            now >= switch.claim_started_at + CHALLENGE_PERIOD,
+            SwitchError::ChallengeWindowOpen
         );
 
         emit!(Claimed {
@@ -138,6 +192,24 @@ pub mod deadman_switch {
     }
 }
 
+fn validate_interval(interval: i64) -> Result<()> {
+    require!(
+        (MIN_INTERVAL..=MAX_INTERVAL).contains(&interval),
+        SwitchError::InvalidInterval
+    );
+    Ok(())
+}
+
+fn veto_pending_claim(switch: &mut Switch) {
+    if switch.claim_started_at != 0 {
+        switch.claim_started_at = 0;
+        emit!(ClaimVetoed {
+            owner: switch.owner,
+            beneficiary: switch.beneficiary,
+        });
+    }
+}
+
 #[account]
 pub struct Switch {
     pub owner: Pubkey,
@@ -146,10 +218,13 @@ pub struct Switch {
     pub interval: i64,
     pub amount: u64,
     pub bump: u8,
+    /// Unix time the beneficiary started a claim; 0 when no claim is pending.
+    /// Appended last so earlier field offsets (and memcmp filters) are unchanged.
+    pub claim_started_at: i64,
 }
 
 impl Switch {
-    pub const LEN: usize = 32 + 32 + 8 + 8 + 8 + 1;
+    pub const LEN: usize = 32 + 32 + 8 + 8 + 8 + 1 + 8;
 }
 
 #[derive(Accounts)]
@@ -203,6 +278,18 @@ pub struct UpdateConfig<'info> {
     )]
     pub switch: Account<'info, Switch>,
     pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct StartClaim<'info> {
+    #[account(
+        mut,
+        seeds = [b"switch", switch.owner.as_ref()],
+        bump = switch.bump,
+        has_one = beneficiary @ SwitchError::Unauthorized
+    )]
+    pub switch: Account<'info, Switch>,
+    pub beneficiary: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -263,6 +350,20 @@ pub struct ConfigUpdated {
 }
 
 #[event]
+pub struct ClaimStarted {
+    pub owner: Pubkey,
+    pub beneficiary: Pubkey,
+    pub claim_started_at: i64,
+    pub claimable_at: i64,
+}
+
+#[event]
+pub struct ClaimVetoed {
+    pub owner: Pubkey,
+    pub beneficiary: Pubkey,
+}
+
+#[event]
 pub struct Claimed {
     pub owner: Pubkey,
     pub beneficiary: Pubkey,
@@ -280,10 +381,16 @@ pub enum SwitchError {
     StillActive,
     #[msg("Signer is not authorized for this action")]
     Unauthorized,
-    #[msg("Interval must be greater than zero")]
+    #[msg("Interval is outside the allowed range")]
     InvalidInterval,
     #[msg("Amount must be greater than zero")]
     InvalidAmount,
     #[msg("Beneficiary must differ from the owner")]
     InvalidBeneficiary,
+    #[msg("A claim is already pending for this vault")]
+    ClaimAlreadyStarted,
+    #[msg("No claim has been started; call start_claim first")]
+    ClaimNotStarted,
+    #[msg("The owner's challenge window is still open")]
+    ChallengeWindowOpen,
 }

@@ -12,7 +12,9 @@ describe("deadman-switch", () => {
   const program = anchor.workspace.deadmanSwitch as Program<DeadmanSwitch>;
   const connection = provider.connection;
 
+  // Requires a `demo`-feature build: MIN_INTERVAL = 5s, CHALLENGE_PERIOD = 10s.
   const INTERVAL = 6; // seconds
+  const CHALLENGE = 10; // seconds
   const AMOUNT = 0.1 * anchor.web3.LAMPORTS_PER_SOL;
 
   // Fresh owner per test so each gets its own Switch PDA (seeded on owner).
@@ -48,13 +50,37 @@ describe("deadman-switch", () => {
     const pda = switchPda(owner.publicKey);
     await program.methods
       .initialize(beneficiary, new anchor.BN(INTERVAL), new anchor.BN(AMOUNT))
-      .accounts({ switch: pda, owner: owner.publicKey })
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
       .signers([owner])
       .rpc();
     return pda;
   };
 
-  it("happy path: init -> check_in -> claim blocked -> wait -> claim", async () => {
+  const startClaim = (pda: anchor.web3.PublicKey, beneficiary: anchor.web3.Keypair) =>
+    program.methods
+      .startClaim()
+      .accountsPartial({ switch: pda, beneficiary: beneficiary.publicKey })
+      .signers([beneficiary])
+      .rpc();
+
+  const claim = (pda: anchor.web3.PublicKey, beneficiary: anchor.web3.Keypair) =>
+    program.methods
+      .claim()
+      .accountsPartial({ switch: pda, beneficiary: beneficiary.publicKey })
+      .signers([beneficiary])
+      .rpc();
+
+  const expectError = async (p: Promise<unknown>, code: string) => {
+    try {
+      await p;
+    } catch (e) {
+      assert.include(e.toString(), code);
+      return;
+    }
+    assert.fail(`expected ${code}`);
+  };
+
+  it("happy path: init -> check_in -> start_claim blocked -> wait -> start_claim -> challenge -> claim", async () => {
     const owner = await freshOwner();
     const beneficiary = anchor.web3.Keypair.generate();
     const pda = await initialize(owner, beneficiary.publicKey);
@@ -63,33 +89,27 @@ describe("deadman-switch", () => {
     assert.ok(acct.owner.equals(owner.publicKey));
     assert.ok(acct.beneficiary.equals(beneficiary.publicKey));
     assert.equal(acct.interval.toNumber(), INTERVAL);
+    assert.equal(acct.claimStartedAt.toNumber(), 0);
 
     await program.methods
       .checkIn()
-      .accounts({ switch: pda, owner: owner.publicKey })
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
       .signers([owner])
       .rpc();
 
-    // Claim before interval elapses -> StillActive.
-    try {
-      await program.methods
-        .claim()
-        .accounts({ switch: pda, beneficiary: beneficiary.publicKey })
-        .signers([beneficiary])
-        .rpc();
-      assert.fail("claim should have reverted with StillActive");
-    } catch (e) {
-      assert.include(e.toString(), "StillActive");
-    }
+    // Starting a claim before the interval elapses -> StillActive.
+    await expectError(startClaim(pda, beneficiary), "StillActive");
 
     await sleep((INTERVAL + 2) * 1000);
+    await startClaim(pda, beneficiary);
+    assert.isAbove((await program.account.switch.fetch(pda)).claimStartedAt.toNumber(), 0);
 
+    // Finishing inside the challenge window -> ChallengeWindowOpen.
+    await expectError(claim(pda, beneficiary), "ChallengeWindowOpen");
+
+    await sleep((CHALLENGE + 2) * 1000);
     const before = await connection.getBalance(beneficiary.publicKey);
-    await program.methods
-      .claim()
-      .accounts({ switch: pda, beneficiary: beneficiary.publicKey })
-      .signers([beneficiary])
-      .rpc();
+    await claim(pda, beneficiary);
     const after = await connection.getBalance(beneficiary.publicKey);
 
     assert.isAbove(after, before + AMOUNT - 10000); // deposit + rent, minus fee
@@ -97,21 +117,87 @@ describe("deadman-switch", () => {
     assert.isNull(closed);
   });
 
-  it("claim reverts with StillActive before the interval", async () => {
+  it("claim reverts with ClaimNotStarted if start_claim was skipped", async () => {
     const owner = await freshOwner();
     const beneficiary = anchor.web3.Keypair.generate();
     const pda = await initialize(owner, beneficiary.publicKey);
 
-    try {
-      await program.methods
-        .claim()
-        .accounts({ switch: pda, beneficiary: beneficiary.publicKey })
-        .signers([beneficiary])
-        .rpc();
-      assert.fail("expected StillActive");
-    } catch (e) {
-      assert.include(e.toString(), "StillActive");
-    }
+    await sleep((INTERVAL + 2) * 1000);
+    await expectError(claim(pda, beneficiary), "ClaimNotStarted");
+  });
+
+  it("owner check_in during the challenge window vetoes the claim", async () => {
+    const owner = await freshOwner();
+    const beneficiary = anchor.web3.Keypair.generate();
+    const pda = await initialize(owner, beneficiary.publicKey);
+
+    await sleep((INTERVAL + 2) * 1000);
+    await startClaim(pda, beneficiary);
+    await expectError(startClaim(pda, beneficiary), "ClaimAlreadyStarted");
+
+    const sig = await program.methods
+      .checkIn()
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
+      .signers([owner])
+      .rpc();
+    await connection.confirmTransaction(sig, "confirmed");
+    const tx = await connection.getTransaction(sig, { commitment: "confirmed" });
+    const parser = new anchor.EventParser(program.programId, program.coder);
+    const events = [...parser.parseLogs(tx.meta.logMessages)];
+    assert.ok(events.find((e) => e.name === "claimVetoed"), "ClaimVetoed should be emitted");
+
+    assert.equal((await program.account.switch.fetch(pda)).claimStartedAt.toNumber(), 0);
+
+    // The vetoed claim can't finish, and a new one can't start until the
+    // fresh interval elapses.
+    await expectError(claim(pda, beneficiary), "ClaimNotStarted");
+    await expectError(startClaim(pda, beneficiary), "StillActive");
+  });
+
+  it("update_config clears a pending claim", async () => {
+    const owner = await freshOwner();
+    const beneficiary = anchor.web3.Keypair.generate();
+    const pda = await initialize(owner, beneficiary.publicKey);
+
+    await sleep((INTERVAL + 2) * 1000);
+    await startClaim(pda, beneficiary);
+    await program.methods
+      .updateConfig(null, new anchor.BN(INTERVAL + 1))
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
+      .signers([owner])
+      .rpc();
+    assert.equal((await program.account.switch.fetch(pda)).claimStartedAt.toNumber(), 0);
+  });
+
+  it("start_claim reverts if caller is not the beneficiary", async () => {
+    const owner = await freshOwner();
+    const beneficiary = anchor.web3.Keypair.generate();
+    const pda = await initialize(owner, beneficiary.publicKey);
+
+    await sleep((INTERVAL + 2) * 1000);
+    const imposter = await freshOwner();
+    await expectError(startClaim(pda, imposter), "Unauthorized");
+  });
+
+  it("beneficiary can find vaults naming them via a memcmp filter", async () => {
+    const owner = await freshOwner();
+    const beneficiary = anchor.web3.Keypair.generate();
+    const pda = await initialize(owner, beneficiary.publicKey);
+
+    // Account layout: 8 discriminator | 32 owner | 32 beneficiary | ...
+    const found = await program.account.switch.all([
+      { memcmp: { offset: 8 + 32, bytes: beneficiary.publicKey.toBase58() } },
+    ]);
+    assert.equal(found.length, 1);
+    assert.ok(found[0].publicKey.equals(pda));
+  });
+
+  it("start_claim reverts with StillActive before the interval", async () => {
+    const owner = await freshOwner();
+    const beneficiary = anchor.web3.Keypair.generate();
+    const pda = await initialize(owner, beneficiary.publicKey);
+
+    await expectError(startClaim(pda, beneficiary), "StillActive");
   });
 
   it("claim reverts if caller is not the beneficiary", async () => {
@@ -122,16 +208,7 @@ describe("deadman-switch", () => {
     await sleep((INTERVAL + 2) * 1000);
 
     const imposter = await freshOwner();
-    try {
-      await program.methods
-        .claim()
-        .accounts({ switch: pda, beneficiary: imposter.publicKey })
-        .signers([imposter])
-        .rpc();
-      assert.fail("expected Unauthorized");
-    } catch (e) {
-      assert.include(e.toString(), "Unauthorized");
-    }
+    await expectError(claim(pda, imposter), "Unauthorized");
   });
 
   it("check_in reverts if caller is not the owner", async () => {
@@ -143,7 +220,7 @@ describe("deadman-switch", () => {
     try {
       await program.methods
         .checkIn()
-        .accounts({ switch: pda, owner: imposter.publicKey })
+        .accountsPartial({ switch: pda, owner: imposter.publicKey })
         .signers([imposter])
         .rpc();
       assert.fail("expected check_in by non-owner to revert");
@@ -154,19 +231,21 @@ describe("deadman-switch", () => {
     }
   });
 
-  it("initialize rejects a non-positive interval", async () => {
+  it("initialize rejects intervals outside [MIN_INTERVAL, MAX_INTERVAL]", async () => {
     const owner = await freshOwner();
     const beneficiary = anchor.web3.Keypair.generate();
     const pda = switchPda(owner.publicKey);
-    try {
-      await program.methods
-        .initialize(beneficiary.publicKey, new anchor.BN(0), new anchor.BN(AMOUNT))
-        .accounts({ switch: pda, owner: owner.publicKey })
-        .signers([owner])
-        .rpc();
-      assert.fail("expected InvalidInterval");
-    } catch (e) {
-      assert.include(e.toString(), "InvalidInterval");
+    const minInterval = 5;
+    const maxInterval = 10 * 365 * 86_400;
+    for (const interval of [0, minInterval - 1, maxInterval + 1]) {
+      await expectError(
+        program.methods
+          .initialize(beneficiary.publicKey, new anchor.BN(interval), new anchor.BN(AMOUNT))
+          .accountsPartial({ switch: pda, owner: owner.publicKey })
+          .signers([owner])
+          .rpc(),
+        "InvalidInterval"
+      );
     }
   });
 
@@ -177,7 +256,7 @@ describe("deadman-switch", () => {
     try {
       await program.methods
         .initialize(beneficiary.publicKey, new anchor.BN(INTERVAL), new anchor.BN(0))
-        .accounts({ switch: pda, owner: owner.publicKey })
+        .accountsPartial({ switch: pda, owner: owner.publicKey })
         .signers([owner])
         .rpc();
       assert.fail("expected InvalidAmount");
@@ -192,7 +271,7 @@ describe("deadman-switch", () => {
     try {
       await program.methods
         .initialize(owner.publicKey, new anchor.BN(INTERVAL), new anchor.BN(AMOUNT))
-        .accounts({ switch: pda, owner: owner.publicKey })
+        .accountsPartial({ switch: pda, owner: owner.publicKey })
         .signers([owner])
         .rpc();
       assert.fail("expected InvalidBeneficiary");
@@ -210,7 +289,7 @@ describe("deadman-switch", () => {
     const balBefore = await connection.getBalance(pda);
     await program.methods
       .deposit(new anchor.BN(topUp))
-      .accounts({ switch: pda, owner: owner.publicKey })
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
       .signers([owner])
       .rpc();
     const balAfter = await connection.getBalance(pda);
@@ -224,7 +303,7 @@ describe("deadman-switch", () => {
     try {
       await program.methods
         .deposit(new anchor.BN(topUp))
-        .accounts({ switch: pda, owner: imposter.publicKey })
+        .accountsPartial({ switch: pda, owner: imposter.publicKey })
         .signers([imposter])
         .rpc();
       assert.fail("expected non-owner deposit to revert");
@@ -241,7 +320,7 @@ describe("deadman-switch", () => {
     const newBeneficiary = anchor.web3.Keypair.generate();
     await program.methods
       .updateConfig(newBeneficiary.publicKey, new anchor.BN(INTERVAL))
-      .accounts({ switch: pda, owner: owner.publicKey })
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
       .signers([owner])
       .rpc();
 
@@ -252,7 +331,7 @@ describe("deadman-switch", () => {
     try {
       await program.methods
         .updateConfig(null, new anchor.BN(0))
-        .accounts({ switch: pda, owner: owner.publicKey })
+        .accountsPartial({ switch: pda, owner: owner.publicKey })
         .signers([owner])
         .rpc();
       assert.fail("expected InvalidInterval");
@@ -262,21 +341,10 @@ describe("deadman-switch", () => {
 
     // The original beneficiary can no longer claim; the new one can.
     await sleep((INTERVAL + 2) * 1000);
-    try {
-      await program.methods
-        .claim()
-        .accounts({ switch: pda, beneficiary: beneficiary.publicKey })
-        .signers([beneficiary])
-        .rpc();
-      assert.fail("old beneficiary should be Unauthorized");
-    } catch (e) {
-      assert.include(e.toString(), "Unauthorized");
-    }
-    await program.methods
-      .claim()
-      .accounts({ switch: pda, beneficiary: newBeneficiary.publicKey })
-      .signers([newBeneficiary])
-      .rpc();
+    await expectError(startClaim(pda, beneficiary), "Unauthorized");
+    await startClaim(pda, newBeneficiary);
+    await sleep((CHALLENGE + 2) * 1000);
+    await claim(pda, newBeneficiary);
     assert.isNull(await connection.getAccountInfo(pda));
   });
 
@@ -287,7 +355,7 @@ describe("deadman-switch", () => {
 
     const sig = await program.methods
       .checkIn()
-      .accounts({ switch: pda, owner: owner.publicKey })
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
       .signers([owner])
       .rpc();
     await connection.confirmTransaction(sig, "confirmed");
@@ -311,7 +379,7 @@ describe("deadman-switch", () => {
     const before = await connection.getBalance(owner.publicKey);
     await program.methods
       .cancel()
-      .accounts({ switch: pda, owner: owner.publicKey })
+      .accountsPartial({ switch: pda, owner: owner.publicKey })
       .signers([owner])
       .rpc();
     const after = await connection.getBalance(owner.publicKey);
@@ -323,14 +391,10 @@ describe("deadman-switch", () => {
     // Switch is gone, so a later claim cannot resolve the account.
     await sleep((INTERVAL + 2) * 1000);
     try {
-      await program.methods
-        .claim()
-        .accounts({ switch: pda, beneficiary: beneficiary.publicKey })
-        .signers([beneficiary])
-        .rpc();
-      assert.fail("claim should fail against a cancelled switch");
+      await startClaim(pda, beneficiary);
+      assert.fail("start_claim should fail against a cancelled switch");
     } catch (e) {
-      assert.ok(e); // account does not exist
+      assert.notInclude(e.toString(), "should fail"); // account does not exist
     }
   });
 });

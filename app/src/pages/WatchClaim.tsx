@@ -17,10 +17,44 @@ import { VaultGlyph } from "../components/VaultGlyph";
 import { useDemoFlag } from "../hooks/useDemoFlag";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useProgram } from "../hooks/useProgram";
-import { claim as claimIx, fetchSwitch, SwitchView, toView, txErrorMessage } from "../lib/anchor";
-import { fmtUtc, looksLikeSolanaAddress, shortAddr } from "../lib/format";
+import {
+  CHALLENGE_PERIOD_SECS,
+  claim as claimIx,
+  fetchSwitch,
+  fetchSwitchesForBeneficiary,
+  startClaim as startClaimIx,
+  SwitchView,
+  toView,
+  txErrorMessage,
+} from "../lib/anchor";
+import { deriveSwitchPda } from "../lib/pda";
+import { fmtInterval, fmtSeconds, fmtUtc, looksLikeSolanaAddress, shortAddr } from "../lib/format";
 
-type WatchState = "empty" | "watching" | "nearing" | "claimable" | "claimed";
+// claimable = deadline passed, start_claim available
+// challenge = claim started, owner's veto window running
+// finalizable = veto window passed, claim available
+type WatchState =
+  | "empty"
+  | "watching"
+  | "nearing"
+  | "claimable"
+  | "challenge"
+  | "finalizable"
+  | "claimed";
+
+const CHALLENGE_LABEL = fmtSeconds(CHALLENGE_PERIOD_SECS);
+
+function stateFromView(v: SwitchView): WatchState {
+  const now = Date.now();
+  if (v.claimableAtMs != null) return v.claimableAtMs <= now ? "finalizable" : "challenge";
+  const remaining = (v.unlockAtMs - now) / 1000;
+  return remaining <= 0 ? "claimable" : remaining < 60 ? "nearing" : "watching";
+}
+
+/** The countdown tracks the challenge window once a claim is pending. */
+function countdownTarget(v: SwitchView): number {
+  return v.claimableAtMs ?? v.unlockAtMs;
+}
 
 export function WatchClaim() {
   const navigate = useNavigate();
@@ -34,6 +68,7 @@ export function WatchClaim() {
   const [ownerInput, setOwnerInput] = useState("");
   const [ownerAddr, setOwnerAddr] = useState("");
   const [view, setView] = useState<SwitchView | null>(null);
+  const [discovered, setDiscovered] = useState<SwitchView[] | null>(null);
   const [unlockAtMs, setUnlockAtMs] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -42,6 +77,34 @@ export function WatchClaim() {
 
   // Amount shown — real once a vault is loaded, else the demo default.
   const amountSol = view?.amountSol ?? 5.0;
+
+  // Auto-discover every vault naming the connected wallet as beneficiary.
+  useEffect(() => {
+    if (!publicKey) {
+      setDiscovered(null);
+      return;
+    }
+    let cancelled = false;
+    fetchSwitchesForBeneficiary(program, publicKey)
+      .then((list) => !cancelled && setDiscovered(list.map(toView)))
+      .catch((e) => !cancelled && setError(txErrorMessage(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [program, publicKey]);
+
+  function showVault(decoded: SwitchView) {
+    setView(decoded);
+    setOwnerAddr(decoded.owner);
+    setUnlockAtMs(countdownTarget(decoded));
+    setState(stateFromView(decoded));
+  }
+
+  // Re-read the vault after a tx so state reflects the chain, not a guess.
+  async function refreshVault(owner: PublicKey) {
+    const s = await fetchSwitch(program, owner);
+    if (s) showVault(toView(s));
+  }
 
   // Look up the owner's switch on-chain and decode it.
   async function loadVault() {
@@ -65,12 +128,7 @@ export function WatchClaim() {
         setError("No vault found for that address");
         return;
       }
-      const decoded = toView(s);
-      setView(decoded);
-      setOwnerAddr(v);
-      setUnlockAtMs(decoded.unlockAtMs);
-      const remaining = (decoded.unlockAtMs - Date.now()) / 1000;
-      setState(remaining <= 0 ? "claimable" : remaining < 60 ? "nearing" : "watching");
+      showVault(toView(s));
     } catch (e) {
       setError(txErrorMessage(e));
     } finally {
@@ -92,6 +150,12 @@ export function WatchClaim() {
     } else if (s === "claimable") {
       setOwnerAddr(demoOwner);
       setUnlockAtMs(Date.now() - 1000);
+    } else if (s === "challenge") {
+      setOwnerAddr(demoOwner);
+      setUnlockAtMs(Date.now() + CHALLENGE_PERIOD_SECS * 1000);
+    } else if (s === "finalizable") {
+      setOwnerAddr(demoOwner);
+      setUnlockAtMs(Date.now() - 1000);
     } else if (s === "claimed") {
       setOwnerAddr(demoOwner);
       setUnlockAtMs(Date.now() - 60_000);
@@ -100,15 +164,23 @@ export function WatchClaim() {
   }
 
   function onCountdownExpire() {
-    if (state !== "watching" && state !== "nearing") return;
+    const next =
+      state === "watching" || state === "nearing"
+        ? "claimable"
+        : state === "challenge"
+          ? "finalizable"
+          : null;
+    if (!next) return;
     if (!reduced) {
       setShowFlash(true);
       setTimeout(() => setShowFlash(false), 800);
     }
-    setTimeout(() => setState("claimable"), 250);
+    setTimeout(() => setState(next), 250);
   }
 
+  // One button drives both phases: start_claim, then claim after the window.
   function executeClaim() {
+    if (state !== "claimable" && state !== "finalizable") return;
     if (!hasSigner || !publicKey) {
       setVisible(true);
       return;
@@ -122,16 +194,19 @@ export function WatchClaim() {
     }
     setError(null);
     setClaiming(true);
-    claimIx(program, ownerPk, publicKey)
-      .then(() => setState("claimed"))
+    const finishing = state === "finalizable";
+    (finishing ? claimIx : startClaimIx)(program, ownerPk, publicKey)
+      .then(() => (finishing ? setState("claimed") : refreshVault(ownerPk)))
       .catch((e) => setError(txErrorMessage(e)))
       .finally(() => setClaiming(false));
   }
 
-  // Keyboard: SPACE claim if claimable, ENTER load if empty
+  const actionable = state === "claimable" || state === "finalizable";
+
+  // Keyboard: SPACE claim if actionable, ENTER load if empty
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === " " || e.code === "Space") && state === "claimable") {
+      if ((e.key === " " || e.code === "Space") && actionable) {
         e.preventDefault();
         executeClaim();
       } else if (e.key === "Enter" && state === "empty") {
@@ -153,7 +228,17 @@ export function WatchClaim() {
 
         {demo && (
           <div className="flex gap-2 p-2 bg-panel border border-border">
-            {(["empty", "watching", "nearing", "claimable", "claimed"] as WatchState[]).map(
+            {(
+              [
+                "empty",
+                "watching",
+                "nearing",
+                "claimable",
+                "challenge",
+                "finalizable",
+                "claimed",
+              ] as WatchState[]
+            ).map(
               (s) => (
                 <button
                   key={s}
@@ -216,11 +301,43 @@ export function WatchClaim() {
               </button>
             </div>
 
-            <div className="mt-10 text-xs text-muted max-w-lg mx-auto leading-relaxed">
-              <span className="text-green-dim italic">planned:</span>{" "}
-              auto-discover all switches naming your wallet as beneficiary via{" "}
-              <code className="text-violet">getProgramAccounts</code> filtered by{" "}
-              <code className="text-violet">beneficiary == &lt;your wallet&gt;</code>. for the demo, paste an owner address above.
+            <div className="mt-10 max-w-lg mx-auto text-left">
+              <div className="stamp mb-3 text-center">VAULTS NAMING YOUR WALLET</div>
+              {!publicKey && (
+                <p className="text-xs text-muted text-center leading-relaxed">
+                  connect your wallet to find every vault that names you as
+                  beneficiary — no owner address needed.
+                </p>
+              )}
+              {publicKey && discovered == null && (
+                <p className="text-xs text-muted text-center">searching…</p>
+              )}
+              {publicKey && discovered?.length === 0 && (
+                <p className="text-xs text-muted text-center leading-relaxed">
+                  no vaults name {shortAddr(publicKey.toBase58())} as beneficiary.
+                  you can still paste an owner address above.
+                </p>
+              )}
+              {discovered && discovered.length > 0 && (
+                <ul className="flex flex-col gap-2">
+                  {discovered.map((d) => (
+                    <li key={d.owner}>
+                      <button
+                        onClick={() => showVault(d)}
+                        className="w-full flex justify-between items-center gap-3 px-4 py-3 bg-panel border border-border hover:border-violet text-sm cursor-pointer min-h-[44px]"
+                      >
+                        <span className="text-text">
+                          <Stamp>OWNER</Stamp> {shortAddr(d.owner)}
+                        </span>
+                        <span className="text-green-dim tabular">{d.amountSol.toFixed(2)} SOL</span>
+                        <span className="text-violet text-xs tracking-[0.2em] uppercase">
+                          {d.claimableAtMs != null ? "CLAIM PENDING" : "WATCH"} ▶
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </section>
@@ -237,30 +354,46 @@ export function WatchClaim() {
             </span>
             <span className="text-muted">·</span>
             <span>
-              <Stamp>VAULT</Stamp> <span className="text-text">8Hk9...vC3</span>
+              <Stamp>VAULT</Stamp>{" "}
+              <span className="text-text">
+                {view ? shortAddr(deriveSwitchPda(new PublicKey(view.owner))[0].toBase58()) : "8Hk9...vC3"}
+              </span>
             </span>
             <span className="text-muted">·</span>
             <span>
-              <Stamp>INTERVAL</Stamp> <span className="text-text">30 DAYS</span>
+              <Stamp>INTERVAL</Stamp>{" "}
+              <span className="text-text">
+                {view
+                  ? view.intervalSecs < 86400
+                    ? fmtSeconds(view.intervalSecs)
+                    : fmtInterval(view.intervalDays)
+                  : "30 DAYS"}
+              </span>
             </span>
           </div>
 
           <div className="mb-6">
             <StatusBadge
-              icon={state === "claimable" ? "●" : state === "claimed" ? "✓" : "◇"}
+              icon={actionable ? "●" : state === "claimed" ? "✓" : "◇"}
               sub={
                 state === "watching"
                   ? "they're still here"
                   : state === "nearing"
                     ? "any moment now"
                     : state === "claimable"
-                      ? "claim before they race"
-                      : "vault closed"
+                      ? "start the claim to notify the owner"
+                      : state === "challenge"
+                        ? "the owner can still veto"
+                        : state === "finalizable"
+                          ? "no veto — the vault is yours"
+                          : "vault closed"
               }
             >
               {state === "watching" && "WATCHING · OWNER IS ACTIVE"}
               {state === "nearing" && "NEARING ZERO · STAY READY"}
-              {state === "claimable" && "● READY TO CLAIM"}
+              {state === "claimable" && "● CLAIM CAN START"}
+              {state === "challenge" && "CLAIM STARTED · CHALLENGE WINDOW"}
+              {state === "finalizable" && "● READY TO CLAIM"}
               {state === "claimed" && "✓ CLAIMED"}
             </StatusBadge>
           </div>
@@ -268,14 +401,20 @@ export function WatchClaim() {
           {state !== "claimed" && (
             <>
               <Stamp className="block text-center mb-3">
-                {state === "claimable" ? "" : state === "watching" ? "IF THEY STAY SILENT FOR" : "UNTIL CLAIMABLE"}
+                {actionable
+                  ? ""
+                  : state === "watching"
+                    ? "IF THEY STAY SILENT FOR"
+                    : state === "challenge"
+                      ? "OWNER CAN VETO FOR"
+                      : "UNTIL CLAIMABLE"}
               </Stamp>
-              {state === "claimable" && (
+              {actionable && (
                 <div
                   className="stamp text-center mb-3"
                   style={{ color: "var(--green)", letterSpacing: "0.4em" }}
                 >
-                  THE OWNER WENT SILENT
+                  {state === "claimable" ? "THE OWNER WENT SILENT" : "THE CHALLENGE WINDOW CLOSED"}
                 </div>
               )}
 
@@ -287,22 +426,22 @@ export function WatchClaim() {
               {/* Amount block */}
               <div className="text-center mt-10">
                 <div className="stamp mb-2.5">
-                  {state === "claimable" ? "THIS VAULT IS YOURS" : "THIS WILL BECOME YOURS"}
+                  {state === "finalizable" ? "THIS VAULT IS YOURS" : "THIS WILL BECOME YOURS"}
                 </div>
                 <div
                   className={`font-extrabold tabular ${
-                    state === "claimable" ? "text-green" : "text-green-dim"
+                    actionable ? "text-green" : "text-green-dim"
                   }`}
                   style={{
                     fontSize: "clamp(3rem, 9vw, 7.5rem)",
                     lineHeight: 0.9,
                     letterSpacing: "-0.03em",
                     textShadow:
-                      state === "claimable"
+                      actionable
                         ? "0 0 28px rgba(0,255,136,.6), 0 0 80px rgba(0,255,136,.3)"
                         : "0 0 24px rgba(0,170,90,.3)",
                     animation:
-                      state === "claimable" && !reduced
+                      actionable && !reduced
                         ? "amountBreathe 1.6s ease-in-out infinite"
                         : undefined,
                   }}
@@ -315,14 +454,14 @@ export function WatchClaim() {
               <div className="flex justify-center mt-12">
                 <button
                   onClick={executeClaim}
-                  disabled={state !== "claimable"}
+                  disabled={!actionable}
                   className="relative inline-flex flex-col items-center justify-center gap-1.5 px-16 py-7 bg-transparent border-2 font-mono font-extrabold tracking-[0.22em] uppercase text-xl transition-all duration-300 min-w-[360px] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px]"
                   style={{
                     borderColor: "var(--status)",
                     color: "var(--status)",
-                    borderWidth: state === "claimable" ? 3 : 2,
+                    borderWidth: actionable ? 3 : 2,
                     animation:
-                      state === "claimable" && !reduced
+                      actionable && !reduced
                         ? "claimBreathe 2s ease-in-out infinite"
                         : "none",
                   }}
@@ -336,24 +475,37 @@ export function WatchClaim() {
                     style={{ borderColor: "var(--status)" }}
                   />
                   <span>
-                    {state === "claimable" ? `▸ CLAIM ${amountSol.toFixed(2)} SOL` : "◆ CLAIM"}
+                    {state === "claimable"
+                      ? "▸ START CLAIM"
+                      : state === "finalizable"
+                        ? `▸ CLAIM ${amountSol.toFixed(2)} SOL`
+                        : "◆ CLAIM"}
                   </span>
                   <span className="text-xs tracking-[0.22em] font-medium text-muted-deep">
-                    {state === "claimable"
+                    {actionable
                       ? "press [ space ] or click · 1 tx"
-                      : "unlocks at 00:00:00:00"}
+                      : state === "challenge"
+                        ? "unlocks when the challenge window closes"
+                        : "unlocks at 00:00:00:00"}
                   </span>
                 </button>
               </div>
 
-              {state === "claimable" && (
-                <div className="max-w-2xl mx-auto bg-red/[.08] border border-red/30 border-l-2 border-l-red px-4 py-3 text-xs text-muted leading-snug flex gap-2.5 mt-6">
-                  <span className="text-red text-[0.95rem]">⚠</span>
+              {(state === "claimable" || state === "challenge") && (
+                <div className="max-w-2xl mx-auto bg-amber/[.08] border border-amber/30 border-l-2 border-l-amber px-4 py-3 text-xs text-muted leading-snug flex gap-2.5 mt-6">
+                  <span className="text-amber text-[0.95rem]">⚠</span>
                   <span>
-                    <strong className="text-red">this is a race.</strong> the
-                    owner can still <code className="text-text">check_in</code>{" "}
-                    to reset the timer before you broadcast. claim quickly —
-                    once your tx confirms, the funds are yours.
+                    <strong className="text-amber">two steps, by design.</strong>{" "}
+                    starting a claim opens a {CHALLENGE_LABEL} challenge window.
+                    if the owner <code className="text-text">check_in</code>s
+                    during it, the claim is vetoed. if they stay silent, you
+                    finish the claim and the funds are yours.
+                    {state === "challenge" && view?.claimableAtMs != null && (
+                      <>
+                        {" "}window closes ·{" "}
+                        <span className="text-text">{fmtUtc(view.claimableAtMs)}</span>
+                      </>
+                    )}
                   </span>
                 </div>
               )}
@@ -487,8 +639,12 @@ export function WatchClaim() {
       )}
       {claiming && (
         <TxOverlay
-          fnName="claim"
-          sub="require now >= last_checkin + interval → transfer lamports → close Switch PDA → emit Claimed event"
+          fnName={state === "finalizable" ? "claim" : "start_claim"}
+          sub={
+            state === "finalizable"
+              ? "require now >= claim_started_at + challenge → close Switch PDA → lamports to you → emit Claimed"
+              : "require now >= last_checkin + interval → open challenge window → emit ClaimStarted"
+          }
         />
       )}
 

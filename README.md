@@ -2,11 +2,13 @@
 
 A trustless inheritance vault built on Solana. An owner deposits SOL, names a
 beneficiary, and chooses a check-in interval. If the owner stops checking in,
-the beneficiary can claim the vault after the deadline.
+the beneficiary can start a claim after the deadline. The owner then has a
+challenge window to veto it by checking in; if they stay silent, the
+beneficiary receives the vault.
 
 The core program is intentionally simple: no custodian, no keeper service, and
-no privileged server decides when funds move. The beneficiary's `claim`
-transaction checks the deadline on-chain.
+no privileged server decides when funds move. The beneficiary's `start_claim`
+and `claim` transactions check the deadlines on-chain.
 
 > Built for the Solana track of a hackathon. The current deployment is a devnet
 > prototype and has not been audited. Do not use it to custody real funds.
@@ -34,26 +36,57 @@ sequenceDiagram
     O->>P: initialize(beneficiary, interval, amount)
     O->>P: check_in()
     Note over P: Deadline resets on every check-in
-    B->>P: claim()
+    B->>P: start_claim()
     alt Owner is still active
         P-->>B: Revert with StillActive
     else Deadline has elapsed
+        P-->>B: Open challenge window
+    end
+    opt Owner is still alive
+        O->>P: check_in()
+        Note over P: Pending claim vetoed
+    end
+    B->>P: claim()
+    alt Challenge window still open
+        P-->>B: Revert with ChallengeWindowOpen
+    else Window passed with no veto
         P-->>B: Close vault PDA and release SOL
     end
 ```
 
 Each owner has one vault PDA derived from `["switch", owner_pubkey]`. The
-program stores the owner, beneficiary, last check-in timestamp, interval, and
-deposited amount.
+program stores the owner, beneficiary, last check-in timestamp, interval,
+deposited amount, and the start time of any pending claim.
 
 | Instruction | Who can call it | Effect |
 | --- | --- | --- |
 | `initialize` | Owner | Creates the vault PDA and deposits SOL |
-| `check_in` | Owner | Resets the liveness timestamp |
+| `check_in` | Owner | Resets the liveness timestamp and vetoes any pending claim |
 | `deposit` | Owner | Adds SOL to an active vault |
-| `update_config` | Owner | Changes the beneficiary or interval |
-| `claim` | Beneficiary | Releases SOL after the deadline |
+| `update_config` | Owner | Changes the beneficiary or interval and clears any pending claim |
+| `start_claim` | Beneficiary | Opens the challenge window once the deadline has passed |
+| `claim` | Beneficiary | Releases SOL after the challenge window closes with no veto |
 | `cancel` | Owner | Closes the vault and returns SOL |
+
+### Bounds
+
+| Constant | Release build | `demo` feature |
+| --- | --- | --- |
+| `MIN_INTERVAL` | 30 days | 5 seconds |
+| `MAX_INTERVAL` | 10 years | 10 years |
+| `CHALLENGE_PERIOD` | 7 days | 10 seconds |
+
+The constants are exported in the IDL, and the frontend reads them from there.
+The devnet deployment and the local tests use the `demo` feature so the full
+lifecycle fits in a live demo. Never deploy a `demo` build to mainnet.
+
+### Finding vaults as a beneficiary
+
+The beneficiary pubkey is stored at byte offset 40 (after the 8-byte
+discriminator and the 32-byte owner), so a beneficiary finds every vault that
+names them with one `getProgramAccounts` call and a `memcmp` filter. No owner
+address is needed. The `/watch` screen does this automatically when a wallet is
+connected.
 
 ## Optional Reminders
 
@@ -64,7 +97,9 @@ check in.
 - `subscribe` registers or updates an owner's notification preferences after
   verifying the vault on-chain.
 - `reminder-tick` checks active subscriptions and sends email or Telegram
-  notifications inside the configured warning window.
+  notifications inside the configured warning window. If the beneficiary starts
+  a claim, it alerts the owner right away and keeps alerting until the claim is
+  vetoed or finished.
 
 If the reminder service is unavailable, the program still behaves exactly the
 same way. Contact details remain off-chain. See
@@ -98,9 +133,22 @@ same way. Contact details remain off-chain. See
 ```bash
 npm install
 solana config set --url devnet
-anchor build
-anchor test
+anchor build -- --features demo
 ```
+
+Anchor 1.0's bundled local validator (surfpool) can fail to start in some
+environments. In that case, run `solana-test-validator --bpf-program
+6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu target/deploy/deadman_switch.so`
+and point the suite at it:
+
+```bash
+ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 \
+ANCHOR_WALLET=$HOME/.config/solana/id.json \
+npx ts-mocha -p ./tsconfig.json -t 1000000 tests/deadman-switch.ts
+```
+
+On Node older than 22.12, also set `NODE_OPTIONS=--experimental-require-module`:
+`rpc-websockets` depends on `uuid` 14, which is ESM-only.
 
 ### Frontend
 
@@ -115,8 +163,9 @@ Solflare on devnet, and follow the owner or beneficiary flow.
 
 ### Live Devnet Smoke Test
 
-The smoke test creates a vault, proves that an early claim fails, waits for the
-deadline, claims the vault, and verifies that the PDA closes.
+The smoke test creates a vault, proves that an early `start_claim` fails, waits
+for the deadline, starts a claim, waits out the challenge window, claims the
+vault, and verifies that the PDA closes. It expects a `demo` build on devnet.
 
 ```bash
 ANCHOR_PROVIDER_URL=https://api.devnet.solana.com \
@@ -138,8 +187,11 @@ See [`DEMO.md`](DEMO.md) for the full walkthrough.
 - Deadline enforcement happens in the Solana program, not in the reminder
   service or frontend.
 - Only the configured owner can check in, deposit, update, or cancel.
-- Only the configured beneficiary can claim.
-- Claims before `last_checkin + interval` fail with `StillActive`.
+- Only the configured beneficiary can start or finish a claim.
+- `start_claim` before `last_checkin + interval` fails with `StillActive`.
+- `claim` fails with `ClaimNotStarted` unless a claim is pending, and with
+  `ChallengeWindowOpen` until `CHALLENGE_PERIOD` has passed since it started.
+- Intervals outside `[MIN_INTERVAL, MAX_INTERVAL]` fail with `InvalidInterval`.
 - The devnet program is upgradeable and controlled by the deployment wallet.
 - This prototype has not received a security audit.
 
@@ -147,7 +199,8 @@ See [`DEMO.md`](DEMO.md) for the full walkthrough.
 
 - SOL deposits only; SPL token support is not implemented.
 - One active vault per owner wallet.
-- Beneficiary discovery currently requires the owner's address.
+- Vaults created by the previous program version use the old account layout
+  and can't be read after upgrading. Recreate devnet vaults after redeploying.
 - The activity feed is session-local rather than a persistent event index.
 - The frontend is configured for devnet.
 

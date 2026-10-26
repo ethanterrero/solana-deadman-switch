@@ -108,6 +108,10 @@ export type DeadmanSwitch = {
     },
     {
       "name": "claim",
+      "docs": [
+        "Phase two: after the challenge window passes without a veto, the",
+        "beneficiary receives the vault."
+      ],
       "discriminator": [
         62,
         198,
@@ -272,6 +276,57 @@ export type DeadmanSwitch = {
       ]
     },
     {
+      "name": "startClaim",
+      "docs": [
+        "Phase one: once the owner misses their deadline, the beneficiary starts",
+        "a claim. This opens a challenge window during which any check-in vetoes it."
+      ],
+      "discriminator": [
+        189,
+        230,
+        7,
+        126,
+        6,
+        10,
+        120,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "switch",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  119,
+                  105,
+                  116,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "switch.owner",
+                "account": "switch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "beneficiary",
+          "signer": true,
+          "relations": [
+            "switch"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "updateConfig",
       "discriminator": [
         29,
@@ -374,6 +429,32 @@ export type DeadmanSwitch = {
       ]
     },
     {
+      "name": "claimStarted",
+      "discriminator": [
+        120,
+        169,
+        163,
+        50,
+        247,
+        184,
+        250,
+        198
+      ]
+    },
+    {
+      "name": "claimVetoed",
+      "discriminator": [
+        130,
+        124,
+        78,
+        143,
+        171,
+        137,
+        182,
+        229
+      ]
+    },
+    {
       "name": "claimed",
       "discriminator": [
         217,
@@ -440,7 +521,7 @@ export type DeadmanSwitch = {
     {
       "code": 6002,
       "name": "invalidInterval",
-      "msg": "Interval must be greater than zero"
+      "msg": "Interval is outside the allowed range"
     },
     {
       "code": 6003,
@@ -451,6 +532,21 @@ export type DeadmanSwitch = {
       "code": 6004,
       "name": "invalidBeneficiary",
       "msg": "Beneficiary must differ from the owner"
+    },
+    {
+      "code": 6005,
+      "name": "claimAlreadyStarted",
+      "msg": "A claim is already pending for this vault"
+    },
+    {
+      "code": 6006,
+      "name": "claimNotStarted",
+      "msg": "No claim has been started; call start_claim first"
+    },
+    {
+      "code": 6007,
+      "name": "challengeWindowOpen",
+      "msg": "The owner's challenge window is still open"
     }
   ],
   "types": [
@@ -478,6 +574,46 @@ export type DeadmanSwitch = {
           {
             "name": "lastCheckin",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "beneficiary",
+            "type": "pubkey"
+          },
+          {
+            "name": "claimStartedAt",
+            "type": "i64"
+          },
+          {
+            "name": "claimableAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimVetoed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "beneficiary",
+            "type": "pubkey"
           }
         ]
       }
@@ -570,6 +706,14 @@ export type DeadmanSwitch = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "claimStartedAt",
+            "docs": [
+              "Unix time the beneficiary started a claim; 0 when no claim is pending.",
+              "Appended last so earlier field offsets (and memcmp filters) are unchanged."
+            ],
+            "type": "i64"
           }
         ]
       }
@@ -601,6 +745,26 @@ export type DeadmanSwitch = {
           }
         ]
       }
+    }
+  ],
+  "constants": [
+    {
+      "name": "challengePeriod",
+      "type": "i64",
+      "value": "10"
+    },
+    {
+      "name": "maxInterval",
+      "docs": [
+        "Longest allowed check-in interval, in seconds."
+      ],
+      "type": "i64",
+      "value": "315360000"
+    },
+    {
+      "name": "minInterval",
+      "type": "i64",
+      "value": "5"
     }
   ]
 };

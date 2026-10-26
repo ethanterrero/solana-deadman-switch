@@ -8,7 +8,7 @@ Two answers per question: the **one-liner** you say out loud, and a **deeper** e
 
 > "How does the program know the owner is gone?"
 
-**One-liner.** It doesn't. The program is lazy — when a beneficiary calls `claim`, it checks `now ≥ last_checkin + interval` against the on-chain `Clock` sysvar. If the time gate is open, the funds move. Nothing watches in between.
+**One-liner.** It doesn't. The program is lazy — when a beneficiary calls `start_claim`, it checks `now ≥ last_checkin + interval` against the on-chain `Clock` sysvar. That opens a challenge window; if the owner doesn't check in before it closes, `claim` moves the funds. Nothing watches in between.
 
 **Deeper.** Solana exposes the cluster's current Unix timestamp as a sysvar; every transaction can read it for free. The `claim` instruction:
 ```rust
@@ -32,7 +32,7 @@ No keeper bot, no Switchboard oracle, no Pyth feed, no cron job. The "is the own
 
 > "What stops the beneficiary from claiming early?"
 
-**One-liner.** A `require!` macro in the `claim` instruction. Try to claim before the time gate and the tx reverts with `StillActive`.
+**One-liner.** Two time gates. `start_claim` reverts with `StillActive` before the owner's deadline, and `claim` reverts with `ChallengeWindowOpen` until the owner's veto window has passed.
 
 **Deeper.** Same `clock.unix_timestamp` check as above. Solana's Clock is consensus-driven — every validator agrees on it. There's no race-window or oracle-manipulation surface; the timestamp is a single global value at slot N. A premature claim isn't a vulnerability you mitigate; it's an op that simply doesn't execute.
 
@@ -42,15 +42,15 @@ No keeper bot, no Switchboard oracle, no Pyth feed, no cron job. The "is the own
 
 **One-liner.** A PDA has no private key. Only program code can move lamports out of it — that's what makes the vault *trustless*.
 
-**Deeper.** A PDA (program-derived address) is a point off the ed25519 curve, so it can't be a real public key. There's no signer that can authorize an arbitrary transfer; the only way lamports leave the PDA is via the program's instructions, which encode the time gate. No admin key, no upgrade authority I retain access to, no escape hatch. The `close = recipient` constraint on `claim`/`cancel` does the lamport sweep without CPI signing.
+**Deeper.** A PDA (program-derived address) is a point off the ed25519 curve, so it can't be a real public key. There's no signer that can authorize an arbitrary transfer; the only way lamports leave the PDA is via the program's instructions, which encode the time gate. No admin key and no escape hatch in the program logic. The devnet program is still upgradeable by the deploy wallet (see the last question below). The `close = recipient` constraint on `claim`/`cancel` does the lamport sweep without CPI signing.
 
 ---
 
 > "What's the worst case? What can go wrong?"
 
-**One-liner.** The owner forgets to check in and the vault releases. That's the *intended* worst case.
+**One-liner.** The owner forgets to check in, ignores every reminder, and doesn't veto during the challenge window, so the vault releases. That's the *intended* worst case.
 
-**Deeper.** I built reminders (email + Telegram via Supabase) explicitly so this doesn't surprise the user. Reminders are off-chain — if they fail, the funds are exactly as safe; the on-chain `claim` still requires the time gate. The other risk is the owner choosing an interval that's too short for their life. We mitigate this with sane defaults (30 days minimum in production) and an oath screen that forces them to read the consequence before signing.
+**Deeper.** I built reminders (email + Telegram via Supabase) explicitly so this doesn't surprise the user. Reminders are off-chain — if they fail, the funds are exactly as safe; the on-chain `claim` still requires the time gate. The other risk is the owner choosing an interval that's too short for their life. The program enforces a 30-day minimum interval in release builds (`MIN_INTERVAL`), and the 7-day challenge window gives a hospitalized or traveling owner one more chance to veto. The reminder service alerts them the moment a claim starts.
 
 ---
 

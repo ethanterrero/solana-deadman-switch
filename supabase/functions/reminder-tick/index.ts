@@ -3,7 +3,8 @@
 // Runs on a schedule (pg_cron -> pg_net -> this function). For every enabled
 // subscription it reads the live on-chain Switch account, computes how long
 // until the switch unlocks, and — if the owner is inside their chosen warning
-// window — sends an email (Resend) and/or Telegram ping. It is the ONLY moving
+// window, or the beneficiary has started a claim the owner can still veto —
+// sends an email (Resend) and/or Telegram ping. It is the ONLY moving
 // off-chain part of the system and it is purely advisory: it never touches
 // funds and the on-chain `claim` time-gate stands on its own.
 //
@@ -24,10 +25,12 @@ const PROGRAM_ID = "6gbTnghr3AXPbCTjieq3veCmt656ALbEd7VUGX9z5fFu";
 const DEFAULT_RPC = "https://api.devnet.solana.com";
 
 // Switch account layout (Anchor): 8 disc | 32 owner | 32 beneficiary |
-// 8 last_checkin (i64 LE) | 8 interval (i64 LE) | 8 amount (u64 LE) | 1 bump
+// 8 last_checkin (i64 LE) | 8 interval (i64 LE) | 8 amount (u64 LE) | 1 bump |
+// 8 claim_started_at (i64 LE, 0 = no pending claim)
 const OFF_LAST_CHECKIN = 8 + 32 + 32; // 72
 const OFF_INTERVAL = OFF_LAST_CHECKIN + 8; // 80
-const MIN_LEN = 8 + 32 + 32 + 8 + 8 + 8 + 1; // 97
+const OFF_CLAIM_STARTED_AT = OFF_INTERVAL + 8 + 8 + 1; // 97
+const MIN_LEN = OFF_CLAIM_STARTED_AT + 8; // 105
 
 type Sub = {
   id: string;
@@ -40,6 +43,7 @@ type Sub = {
   last_unlock_at: number | null;
   last_notified_at: string | null;
   claimable_notified: boolean;
+  claim_alert_for: number | null;
 };
 
 function explorer(addr: string): string {
@@ -78,12 +82,16 @@ async function rpcGetAccount(rpc: string, pubkey: string): Promise<Uint8Array | 
   return bytes;
 }
 
-function decodeUnlock(bytes: Uint8Array): number {
+/** Returns the unlock time and any pending claim's start, in unix seconds. */
+function decodeSwitch(bytes: Uint8Array): { unlock: number; claimStartedAt: number } {
   if (bytes.length < MIN_LEN) throw new Error("account too small to be a Switch");
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const lastCheckin = dv.getBigInt64(OFF_LAST_CHECKIN, true);
   const interval = dv.getBigInt64(OFF_INTERVAL, true);
-  return Number(lastCheckin + interval); // unix seconds
+  return {
+    unlock: Number(lastCheckin + interval),
+    claimStartedAt: Number(dv.getBigInt64(OFF_CLAIM_STARTED_AT, true)),
+  };
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
@@ -155,7 +163,7 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      const unlock = decodeUnlock(bytes);
+      const { unlock, claimStartedAt } = decodeSwitch(bytes);
       const timeLeft = unlock - now;
 
       // New window? Owner checked in or changed the interval since we last looked.
@@ -172,17 +180,44 @@ Deno.serve(async (req: Request) => {
 
       const unlockIso = new Date(unlock * 1000).toISOString();
       const link = explorer(sub.switch_pda);
+      const sinceLast = lastNotifiedAt
+        ? (now - Math.floor(new Date(lastNotifiedAt).getTime() / 1000))
+        : Infinity;
 
-      if (timeLeft <= 0) {
-        // Funds are claimable now — send a one-shot final notice.
+      if (claimStartedAt !== 0) {
+        // The beneficiary started a claim. This is the alert that matters most:
+        // fire immediately for a new claim, then on the usual frequency until
+        // the owner vetoes (check-in clears it) or the claim completes.
+        const isNewClaim = sub.claim_alert_for !== claimStartedAt;
+        if (isNewClaim || sinceLast >= sub.frequency_seconds) {
+          const startedIso = new Date(claimStartedAt * 1000).toISOString();
+          const subject = "URGENT: your beneficiary started a claim on your switch";
+          const html =
+            `<p>Your beneficiary started a claim on your dead man's switch at ${startedIso}.</p>` +
+            `<p><b>If you are still here, check in now.</b> A check-in vetoes the claim. ` +
+            `Once the challenge window closes, they can take the funds.</p>` +
+            `<p>Switch: <a href="${link}">${sub.switch_pda}</a></p>`;
+          const text =
+            `🚨 Your beneficiary started a claim on your dead man's switch (${startedIso}). ` +
+            `Check in now to veto it.\n${link}`;
+          if (sub.email) await sendEmail(sub.email, subject, html);
+          if (sub.telegram_chat_id) await sendTelegram(sub.telegram_chat_id, text);
+          patch.claim_alert_for = claimStartedAt;
+          patch.last_notified_at = new Date(now * 1000).toISOString();
+          notified++;
+        }
+      } else if (timeLeft <= 0) {
+        // The beneficiary can start a claim now — send a one-shot notice.
         if (!claimableNotified) {
           const subject = "Your dead man's switch has UNLOCKED";
           const html =
-            `<p>The check-in window for your switch has elapsed. Your beneficiary can now claim the funds.</p>` +
-            `<p>If this is unexpected, there is nothing more to do — the window has passed.</p>` +
+            `<p>The check-in window for your switch has elapsed. Your beneficiary can now start a claim.</p>` +
+            `<p>If this is unexpected, check in now to reset the timer. If they start a claim, ` +
+            `you will be alerted and have a challenge window to veto it.</p>` +
             `<p>Switch: <a href="${link}">${sub.switch_pda}</a></p>`;
           const text =
-            `⚠️ Your dead man's switch has UNLOCKED. The beneficiary can now claim.\n${link}`;
+            `⚠️ Your dead man's switch has UNLOCKED. The beneficiary can now start a claim. ` +
+            `Check in to reset.\n${link}`;
           if (sub.email) await sendEmail(sub.email, subject, html);
           if (sub.telegram_chat_id) await sendTelegram(sub.telegram_chat_id, text);
           patch.claimable_notified = true;
@@ -190,9 +225,6 @@ Deno.serve(async (req: Request) => {
         }
       } else if (timeLeft <= sub.lead_seconds) {
         // Inside the warning window — fire if enough time since the last reminder.
-        const sinceLast = lastNotifiedAt
-          ? (now - Math.floor(new Date(lastNotifiedAt).getTime() / 1000))
-          : Infinity;
         if (sinceLast >= sub.frequency_seconds) {
           const left = fmtDuration(timeLeft);
           const subject = `Check in: your switch unlocks in ${left}`;

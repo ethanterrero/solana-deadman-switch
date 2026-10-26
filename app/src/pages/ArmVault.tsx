@@ -15,7 +15,7 @@ import { ErrorToast } from "../components/ErrorToast";
 import { useFlag } from "../hooks/useDemoFlag";
 import { useProgram } from "../hooks/useProgram";
 import { useTx } from "../hooks/useTx";
-import { fetchSwitch, initialize } from "../lib/anchor";
+import { fetchSwitch, initialize, MAX_INTERVAL_SECS, MIN_INTERVAL_SECS } from "../lib/anchor";
 import { deriveSwitchPda } from "../lib/pda";
 import { subscribe } from "../lib/supabase";
 import { fmtInterval, fmtSeconds, looksLikeSolanaAddress, shortAddr } from "../lib/format";
@@ -447,7 +447,11 @@ function StepInterval({
   onNext: () => void;
 }) {
   const unitLabel = fast ? "SECONDS" : "DAYS";
-  const presets = fast
+  const toSecs = (n: number) => (fast ? n : n * 86400);
+  // Mirrors the on-chain MIN_INTERVAL / MAX_INTERVAL check.
+  const inRange = (n: number) => toSecs(n) >= MIN_INTERVAL_SECS && toSecs(n) <= MAX_INTERVAL_SECS;
+  const valid = inRange(value);
+  const allPresets = fast
     ? [
         { value: 30, label: "30s" },
         { value: 60, label: "60s" },
@@ -461,6 +465,7 @@ function StepInterval({
         { value: 90, label: "90 DAYS" },
         { value: 365, label: "1 YEAR" },
       ];
+  const presets = allPresets.filter((p) => inRange(p.value));
   return (
     <section className="flex flex-col gap-6">
       <div>
@@ -487,13 +492,19 @@ function StepInterval({
           min={1}
           value={value}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onNext();
+            if (e.key === "Enter" && valid) onNext();
           }}
           onChange={(e) => setValue(parseInt(e.target.value) || 0)}
         />
         <div className="text-muted text-sm tracking-widest uppercase text-center mt-[-0.5rem]">
           {unitLabel}
         </div>
+        {!valid && (
+          <div className="text-red text-xs text-center mt-2">
+            interval must be between {fmtSeconds(MIN_INTERVAL_SECS)} and{" "}
+            {fmtSeconds(MAX_INTERVAL_SECS)}
+          </div>
+        )}
         <div className="flex justify-center mt-4">
           <PresetGroup
             ariaLabel="interval presets"
@@ -506,7 +517,7 @@ function StepInterval({
 
       <div className="flex gap-3 mt-6">
         <Button onClick={onBack}>◀ BACK</Button>
-        <Button variant="primary" onClick={onNext}>
+        <Button variant="primary" disabled={!valid} onClick={onNext}>
           NEXT ▶▶
         </Button>
       </div>
